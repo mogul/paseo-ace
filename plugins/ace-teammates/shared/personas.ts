@@ -154,7 +154,7 @@ export const PERSONAS: Persona[] = [
   {
     id: "programmer",
     name: "Generalist Programmer",
-    emoji: "👨💻",
+    emoji: "💻",
     description: "Does general coding work.",
     soul: [
       "# Soul",
@@ -166,7 +166,7 @@ export const PERSONAS: Persona[] = [
     identity: [
       "# Identity",
       "",
-      "👨💻 Generalist Programmer — I take on everyday coding work across the codebase.",
+      "💻 Generalist Programmer — I take on everyday coding work across the codebase.",
       "",
       "I implement features and fixes, keep changes focused, and explain what I touched.",
     ].join("\n"),

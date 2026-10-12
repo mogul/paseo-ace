@@ -2,7 +2,7 @@ import type { PluginTheme } from "@getpaseo/plugin";
 import type { PluginScreenProps } from "@getpaseo/plugin/client";
 import { usePaseo, useRpc } from "@getpaseo/plugin/client";
 import { copyText, Modal, ScrollView as HostScrollView, TextInput as HostTextInput, useToast } from "@getpaseo/plugin/client/react-native";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useRef, useState } from "react";
 import { Dimensions, Pressable, Text, View } from "react-native";
 import {
@@ -19,8 +19,16 @@ import { PERSONAS } from "../shared/personas";
 
 const EMOJI_CHOICES = [
   "🤖", "🧊", "🗂️", "🔍", "📋", "🧠", "🛠️", "🚀",
-  "👨💻", "🔐", "🎨", "📊", "👔", "🧪", "🔬", "⚙️",
-  "🧹", "📦", "🔎", "🧯", "🕵️", "🧑🔬", "🤝", "✨",
+  "💻", "🔐", "🎨", "📊", "👔", "🧪", "🔬", "⚙️",
+  "🧹", "📦", "🔎", "🧯", "🕵️", "🔮", "🤝", "✨",
+];
+
+const HEARTBEAT_PRESETS: { label: string; cron: string }[] = [
+  { label: "Off", cron: "" },
+  { label: "Every 5 min", cron: "*/5 * * * *" },
+  { label: "Hourly", cron: "0 * * * *" },
+  { label: "Daily", cron: "0 9 * * *" },
+  { label: "Weekdays", cron: "0 9 * * 1-5" },
 ];
 
 type Overlay =
@@ -300,8 +308,9 @@ function BoardPicker({
   return (
     <View style={{ gap: 6 }}>
       <Text style={labelStyle(c)}>Resident board</Text>
-      <Pressable accessibilityRole="button" accessibilityLabel="Resident board" onPress={() => setOpen((o) => !o)} style={inputStyle(c)}>
+      <Pressable accessibilityRole="button" accessibilityLabel="Resident board" onPress={() => setOpen((o) => !o)} style={{ ...inputStyle(c), flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
         <Text style={{ color: selected ? c.foreground : c.foregroundMuted }}>{selected ? selected.name : "(none)"}</Text>
+        <Text style={{ color: c.foregroundMuted, fontSize: 12 }}>▾</Text>
       </Pressable>
       {open ? (
         <View style={{ borderWidth: 1, borderColor: c.border, borderRadius: 8, backgroundColor: c.surface0 }}>
@@ -335,36 +344,144 @@ function BoardPicker({
   );
 }
 
-function EmojiPicker({ theme, value, onChange }: { theme: PluginTheme; value?: string; onChange: (emoji: string) => void }) {
+function EmojiButton({ theme, value, onChange }: { theme: PluginTheme; value?: string; onChange: (emoji: string) => void }) {
   const c = theme.colors;
+  const [open, setOpen] = useState(false);
+  return (
+    <View style={{ zIndex: open ? 30 : 0 }}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Choose emoji"
+        onPress={() => setOpen((o) => !o)}
+        style={{ width: 40, height: 40, alignItems: "center", justifyContent: "center", borderRadius: 8, borderWidth: 1, borderColor: open ? c.accent : c.border, backgroundColor: c.surface0 }}
+      >
+        <Text style={{ fontSize: 18 }}>{value || "🙂"}</Text>
+      </Pressable>
+      {open ? (
+        <View style={{ position: "absolute", top: 44, left: 0, zIndex: 20, elevation: 8, width: 232, backgroundColor: c.surface1, borderRadius: 8, borderWidth: 1, borderColor: c.border, padding: 8 }}>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+            {EMOJI_CHOICES.map((e) => {
+              const selected = value === e;
+              return (
+                <Pressable
+                  key={e}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Emoji ${e}`}
+                  onPress={() => { onChange(e); setOpen(false); }}
+                  style={{ width: 36, height: 36, alignItems: "center", justifyContent: "center", borderRadius: 8, borderWidth: 1, borderColor: selected ? c.accent : c.border, backgroundColor: selected ? c.accent : c.surface0 }}
+                >
+                  <Text style={{ fontSize: 18 }}>{e}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+function ProviderCombobox({ theme, value, onChange }: { theme: PluginTheme; value: string; onChange: (v: string) => void }) {
+  const c = theme.colors;
+  const paseo = usePaseo();
+  const [open, setOpen] = useState(false);
+  const blurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const providersQuery = useQuery({
+    queryKey: ["ace-teammates", "providers"],
+    queryFn: () => paseo.providers.listAvailable(),
+    staleTime: 60000,
+  });
+  const harnesses = useMemo(() => (providersQuery.data?.providers ?? []).map((p) => p.provider), [providersQuery.data]);
+  const modelQueries = useQueries({
+    queries: harnesses.map((h) => ({
+      queryKey: ["ace-teammates", "models", h],
+      queryFn: () => paseo.providers.listModels(h),
+      staleTime: 60000,
+    })),
+  });
+
+  const options = useMemo(() => {
+    const out: string[] = [];
+    harnesses.forEach((h, i) => {
+      for (const m of modelQueries[i]?.data?.models ?? []) out.push(`${h}/${m.id}`);
+    });
+    return out;
+  }, [harnesses, modelQueries]);
+
+  const q = value.trim().toLowerCase();
+  const matches = (q ? options.filter((o) => o.toLowerCase().includes(q)) : options).slice(0, 50);
+
+  function closeSoon() {
+    if (blurTimer.current) clearTimeout(blurTimer.current);
+    blurTimer.current = setTimeout(() => setOpen(false), 150);
+  }
+
   return (
     <View style={{ gap: 6 }}>
-      <Text style={labelStyle(c)}>Emoji</Text>
+      <HostTextInput
+        value={value}
+        onChangeText={(v) => { onChange(v); setOpen(true); }}
+        style={inputStyle(c)}
+        autoCapitalize="none"
+        autoCorrect={false}
+        placeholder="opencode/opencode-go/deepseek-v4-flash"
+        placeholderTextColor={c.foregroundMuted}
+        onFocus={() => { if (blurTimer.current) clearTimeout(blurTimer.current); setOpen(true); }}
+        onBlur={closeSoon}
+      />
+      {open && matches.length > 0 ? (
+        <HostScrollView style={{ maxHeight: 180, borderWidth: 1, borderColor: c.border, borderRadius: 8, backgroundColor: c.surface0 }} keyboardShouldPersistTaps="handled">
+          {matches.map((o) => (
+            <Pressable
+              key={o}
+              accessibilityRole="button"
+              accessibilityLabel={o}
+              onPress={() => { onChange(o); setOpen(false); }}
+              style={{ paddingHorizontal: 10, paddingVertical: 8 }}
+            >
+              <Text style={{ color: o === value ? c.accent : c.foreground, fontSize: 12 }}>{o}</Text>
+            </Pressable>
+          ))}
+        </HostScrollView>
+      ) : null}
+    </View>
+  );
+}
+
+function HeartbeatPicker({ theme, value, onChange }: { theme: PluginTheme; value: string; onChange: (v: string) => void }) {
+  const c = theme.colors;
+  const [custom, setCustom] = useState(value !== "" && !HEARTBEAT_PRESETS.some((p) => p.cron === value));
+  return (
+    <View style={{ gap: 6 }}>
+      <Text style={labelStyle(c)}>Heartbeat (cron)</Text>
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
-        {EMOJI_CHOICES.map((e) => {
-          const selected = value === e;
+        {HEARTBEAT_PRESETS.map((p) => {
+          const selected = !custom && value === p.cron;
           return (
             <Pressable
-              key={e}
+              key={p.label}
               accessibilityRole="button"
-              accessibilityLabel={`Emoji ${e}`}
-              onPress={() => onChange(e)}
-              style={{
-                width: 36,
-                height: 36,
-                alignItems: "center",
-                justifyContent: "center",
-                borderRadius: 8,
-                borderWidth: 1,
-                borderColor: selected ? c.accent : c.border,
-                backgroundColor: selected ? c.accent : c.surface1,
-              }}
+              accessibilityLabel={`Heartbeat ${p.label}`}
+              onPress={() => { setCustom(false); onChange(p.cron); }}
+              style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: selected ? c.accent : c.border, backgroundColor: selected ? c.accent : c.surface1 }}
             >
-              <Text style={{ fontSize: 18 }}>{e}</Text>
+              <Text style={{ color: selected ? c.accentForeground : c.foreground, fontSize: 12 }}>{p.label}</Text>
             </Pressable>
           );
         })}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Heartbeat Custom"
+          onPress={() => setCustom(true)}
+          style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: custom ? c.accent : c.border, backgroundColor: custom ? c.accent : c.surface1 }}
+        >
+          <Text style={{ color: custom ? c.accentForeground : c.foreground, fontSize: 12 }}>Custom</Text>
+        </Pressable>
       </View>
+      {custom ? (
+        <HostTextInput value={value} onChangeText={onChange} style={inputStyle(c)} autoCapitalize="none" autoCorrect={false} placeholder="0 9 * * 1-5" placeholderTextColor={c.foregroundMuted} />
+      ) : null}
     </View>
   );
 }
@@ -373,7 +490,7 @@ function PersonaPicker({ theme, value, onChange }: { theme: PluginTheme; value?:
   const c = theme.colors;
   return (
     <View style={{ gap: 6 }}>
-      <Text style={labelStyle(c)}>Persona</Text>
+      <Text style={labelStyle(c)}>Starting Point</Text>
       <HostScrollView style={{ maxHeight: 200 }}>
         <View style={{ gap: 6 }}>
           {PERSONAS.map((p) => {
@@ -428,16 +545,17 @@ function NewTeammateModal({ theme, boards, onClose, onCreate }: { theme: PluginT
     <Modal title="New teammate" open onOpenChange={(o) => { if (!o) onClose(); }}>
       <Modal.Content contentContainerStyle={{ gap: 12 }}>
         <Text style={labelStyle(c)}>Name</Text>
-        <HostTextInput value={name} onChangeText={setName} style={inputStyle(c)} autoFocus />
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <EmojiButton theme={theme} value={emoji} onChange={selectEmoji} />
+          <HostTextInput value={name} onChangeText={setName} style={[inputStyle(c), { flex: 1 }]} autoFocus />
+        </View>
         <Text style={labelStyle(c)}>Description</Text>
         <HostTextInput value={description} onChangeText={setDescription} style={inputStyle(c)} />
         <Text style={labelStyle(c)}>Provider</Text>
-        <HostTextInput value={provider} onChangeText={setProvider} style={inputStyle(c)} autoCapitalize="none" autoCorrect={false} placeholder="opencode/opencode-go/deepseek-v4-flash" placeholderTextColor={c.foregroundMuted} />
+        <ProviderCombobox theme={theme} value={provider} onChange={setProvider} />
         <PersonaPicker theme={theme} value={personaId} onChange={selectPersona} />
-        <EmojiPicker theme={theme} value={emoji} onChange={selectEmoji} />
         <BoardPicker theme={theme} boards={boards} value={boardId} onChange={setBoardId} />
-        <Text style={labelStyle(c)}>Heartbeat (cron)</Text>
-        <HostTextInput value={heartbeatCron} onChangeText={setHeartbeatCron} style={inputStyle(c)} autoCapitalize="none" autoCorrect={false} placeholder="0 9 * * 1-5" placeholderTextColor={c.foregroundMuted} />
+        <HeartbeatPicker theme={theme} value={heartbeatCron} onChange={setHeartbeatCron} />
         <View style={{ flexDirection: "row", gap: 8, justifyContent: "flex-end" }}>
           <Pressable accessibilityRole="button" onPress={onClose} style={btn(c)}>
             <Text style={{ color: c.foreground }}>Cancel</Text>
@@ -497,11 +615,12 @@ function RenameModal({ theme, teammate, boards, onClose, onRename }: { theme: Pl
     <Modal title="Rename teammate" open onOpenChange={(o) => { if (!o) onClose(); }}>
       <Modal.Content contentContainerStyle={{ gap: 12 }}>
         <Text style={labelStyle(c)}>Name</Text>
-        <HostTextInput value={name} onChangeText={setName} style={inputStyle(c)} autoFocus />
-        <EmojiPicker theme={theme} value={emoji} onChange={setEmoji} />
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <EmojiButton theme={theme} value={emoji} onChange={setEmoji} />
+          <HostTextInput value={name} onChangeText={setName} style={[inputStyle(c), { flex: 1 }]} autoFocus />
+        </View>
         <BoardPicker theme={theme} boards={boards} value={boardId} onChange={setBoardId} />
-        <Text style={labelStyle(c)}>Heartbeat (cron)</Text>
-        <HostTextInput value={heartbeatCron} onChangeText={setHeartbeatCron} style={inputStyle(c)} autoCapitalize="none" autoCorrect={false} placeholder="0 9 * * 1-5" placeholderTextColor={c.foregroundMuted} />
+        <HeartbeatPicker theme={theme} value={heartbeatCron} onChange={setHeartbeatCron} />
         <View style={{ flexDirection: "row", gap: 8, justifyContent: "flex-end" }}>
           <Pressable accessibilityRole="button" onPress={onClose} style={btn(c)}>
             <Text style={{ color: c.foreground }}>Cancel</Text>
