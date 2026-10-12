@@ -1,25 +1,21 @@
-# ACE
+# ACE Boards
 
-ACE is a board of zones for your Paseo workspaces. Each workspace is a card showing its branch, pull request, and active agent sessions. You arrange work by moving a card into a zone; a zone with a prompt runs that prompt in the workspace when a card lands there, while a zone with no prompt is a plain status flag.
+ACE Boards is a board of zones for your Paseo workspaces. Each workspace is a card showing its branch, pull request, issue pills, and a live session tree. Move a card into a zone to run that zone's prompt, or use zones as status flags. Multiple boards, per-board card defaults, and a board MCP let you and your agents organize and drive the work.
 
 ## How it works
 
-The board is a single screen in the Paseo sidebar, on desktop, web, and mobile. A server-side engine stores the board layout and, when a card is moved into a zone with a trigger, spawns an agent (or messages an existing one) in that workspace's directory using the zone's templated prompt. Board data persists to `board.json` under the daemon's Paseo home.
+The board is a single screen in the Paseo sidebar, on desktop, web, and mobile. A server-side engine stores each board's layout and, when a card is moved into a zone with a trigger, spawns an agent (or messages an existing one) in that workspace's directory using the zone's templated prompt. A small MCP server exposes `board_list` and `board_move_card` so agents can read and move cards too.
 
 ## Setup
 
-Requires Paseo 0.11.2 or later. The daemon machine needs the providers referenced by zone prompts available. Board data lives under `~/.paseo/ace/` (or `$PASEO_HOME/ace/`).
+Requires Paseo 0.11.2 or later. The daemon machine needs the providers referenced by zone prompts and card defaults available. Board data lives under `~/.paseo/ace/` (or `$PASEO_HOME/ace/`), shared with the `ace-teammates` plugin and git-versionable.
 
-## Zones
+## Boards, zones, and cards
 
-A zone is a region on the board. Its settings are a name and an optional trigger. A trigger chooses whether to create a new agent session or reuse an existing one, whether to send a prompt to it or spawn a child session, a provider, and an editable prompt template. A zone with no trigger is a status flag, so dropping a card into "Human review" just signals a state change.
+A board is a set of zones arranged in columns. A zone has a name and an optional trigger (session mode new or reuse, action prompt or spawn, a provider, and a templated prompt). A zone with no trigger is a status flag. Each board has card defaults that the Create card flow uses to make new workspace cards, including an isolation mode, a base branch, and a provider and model.
 
-Moving a card into a zone with a trigger fires it. Templates resolve against `{{workspace.name}}`, `{{workspace.directory}}`, `{{workspace.kind}}`, `{{branch.name}}`, `{{pr.number}}`, `{{pr.url}}`, `{{pr.title}}`, and `{{zone.title}}`.
-
-## Cards
-
-A card is a workspace. It shows the workspace name, its git branch when present, a pull request pill when one exists, and a collapsible session tree of the agents in that workspace (including sub-agents). Session rows open the corresponding agent. Issue references can be recorded as workspace labels with an `issue:` prefix and appear as pills.
+Cards are workspaces. They show the workspace name, its git branch, a pull request pill, issue pills (workspace labels with an `issue:` prefix), and a collapsible session tree. Cards move between zones and between boards.
 
 ## Limits
 
-The board shows workspaces and agents the daemon lists; archived workspaces are excluded. Zones are arranged in columns and are moved by tapping, not dragging. Scheduled or lifecycle-driven automation is out of scope here and is covered by Paseo's own schedules and other facilities.
+The board shows workspaces and agents the daemon lists; archived workspaces are excluded. Cards move by tapping, not dragging. Scheduled and lifecycle-driven automation are out of scope and covered by Paseo's own schedules. The board is single-user; multiplayer presence is not yet supported.
