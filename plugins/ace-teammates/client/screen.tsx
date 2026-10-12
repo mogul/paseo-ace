@@ -2,6 +2,7 @@ import type { PluginTheme } from "@getpaseo/plugin";
 import type { PluginScreenProps } from "@getpaseo/plugin/client";
 import { usePaseo, useRpc } from "@getpaseo/plugin/client";
 import { copyText, Modal, ScrollView as HostScrollView, TextInput as HostTextInput, useToast } from "@getpaseo/plugin/client/react-native";
+import { ExternalLink } from "@getpaseo/plugin/client/ui";
 import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useRef, useState } from "react";
 import { Dimensions, Pressable, Text, View } from "react-native";
@@ -348,7 +349,7 @@ function EmojiButton({ theme, value, onChange }: { theme: PluginTheme; value?: s
   const c = theme.colors;
   const [open, setOpen] = useState(false);
   return (
-    <View style={{ zIndex: open ? 30 : 0 }}>
+    <View style={{ zIndex: open ? 1000 : 0 }}>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Choose emoji"
@@ -358,7 +359,7 @@ function EmojiButton({ theme, value, onChange }: { theme: PluginTheme; value?: s
         <Text style={{ fontSize: 18 }}>{value || "🙂"}</Text>
       </Pressable>
       {open ? (
-        <View style={{ position: "absolute", top: 44, left: 0, zIndex: 20, elevation: 8, width: 232, backgroundColor: c.surface1, borderRadius: 8, borderWidth: 1, borderColor: c.border, padding: 8 }}>
+        <View style={{ position: "absolute", top: 44, left: 0, zIndex: 1000, elevation: 12, width: 232, backgroundColor: c.surface1, borderRadius: 8, borderWidth: 1, borderColor: c.border, padding: 8 }}>
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
             {EMOJI_CHOICES.map((e) => {
               const selected = value === e;
@@ -385,6 +386,8 @@ function ProviderCombobox({ theme, value, onChange }: { theme: PluginTheme; valu
   const c = theme.colors;
   const paseo = usePaseo();
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [filter, setFilter] = useState("");
   const blurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const providersQuery = useQuery({
@@ -409,27 +412,31 @@ function ProviderCombobox({ theme, value, onChange }: { theme: PluginTheme; valu
     return out;
   }, [harnesses, modelQueries]);
 
-  const q = value.trim().toLowerCase();
+  const q = filter.trim().toLowerCase();
   const matches = (q ? options.filter((o) => o.toLowerCase().includes(q)) : options).slice(0, 50);
+  const display = editing ? filter : value;
 
   function closeSoon() {
     if (blurTimer.current) clearTimeout(blurTimer.current);
-    blurTimer.current = setTimeout(() => setOpen(false), 150);
+    blurTimer.current = setTimeout(() => { setOpen(false); setEditing(false); }, 150);
   }
 
   return (
     <View style={{ gap: 6 }}>
-      <HostTextInput
-        value={value}
-        onChangeText={(v) => { onChange(v); setOpen(true); }}
-        style={inputStyle(c)}
-        autoCapitalize="none"
-        autoCorrect={false}
-        placeholder="opencode/opencode-go/deepseek-v4-flash"
-        placeholderTextColor={c.foregroundMuted}
-        onFocus={() => { if (blurTimer.current) clearTimeout(blurTimer.current); setOpen(true); }}
-        onBlur={closeSoon}
-      />
+      <View style={{ ...inputStyle(c), flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 0 }}>
+        <HostTextInput
+          value={display}
+          onChangeText={(v) => { setFilter(v); onChange(v); setOpen(true); }}
+          style={{ flex: 1, color: c.foreground, padding: 8, fontSize: 13 }}
+          autoCapitalize="none"
+          autoCorrect={false}
+          placeholder="opencode/opencode-go/deepseek-v4-flash"
+          placeholderTextColor={c.foregroundMuted}
+          onFocus={() => { if (blurTimer.current) clearTimeout(blurTimer.current); setEditing(true); setFilter(""); setOpen(true); }}
+          onBlur={closeSoon}
+        />
+        <Text style={{ color: c.foregroundMuted, fontSize: 12, paddingHorizontal: 8 }}>▾</Text>
+      </View>
       {open && matches.length > 0 ? (
         <HostScrollView style={{ maxHeight: 180, borderWidth: 1, borderColor: c.border, borderRadius: 8, backgroundColor: c.surface0 }} keyboardShouldPersistTaps="handled">
           {matches.map((o) => (
@@ -437,7 +444,7 @@ function ProviderCombobox({ theme, value, onChange }: { theme: PluginTheme; valu
               key={o}
               accessibilityRole="button"
               accessibilityLabel={o}
-              onPress={() => { onChange(o); setOpen(false); }}
+              onPress={() => { onChange(o); setEditing(false); setFilter(""); setOpen(false); }}
               style={{ paddingHorizontal: 10, paddingVertical: 8 }}
             >
               <Text style={{ color: o === value ? c.accent : c.foreground, fontSize: 12 }}>{o}</Text>
@@ -480,7 +487,15 @@ function HeartbeatPicker({ theme, value, onChange }: { theme: PluginTheme; value
         </Pressable>
       </View>
       {custom ? (
-        <HostTextInput value={value} onChangeText={onChange} style={inputStyle(c)} autoCapitalize="none" autoCorrect={false} placeholder="0 9 * * 1-5" placeholderTextColor={c.foregroundMuted} />
+        <View style={{ gap: 4 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <Text style={{ color: c.foregroundMuted, fontSize: 12 }}>Cron format</Text>
+            <ExternalLink href="https://crontab.guru/" accessibilityLabel="Cron format documentation">
+              <Text style={{ color: c.accent, fontSize: 12 }}>crontab.guru</Text>
+            </ExternalLink>
+          </View>
+          <HostTextInput value={value} onChangeText={onChange} style={inputStyle(c)} autoCapitalize="none" autoCorrect={false} placeholder="0 9 * * 1-5" placeholderTextColor={c.foregroundMuted} />
+        </View>
       ) : null}
     </View>
   );
