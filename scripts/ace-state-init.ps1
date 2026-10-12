@@ -1,27 +1,27 @@
 <#
 .SYNOPSIS
-  One-shot setup: put the ACE plugins' runtime state (boards + teammates) into a
+  One-shot setup: put the aces plugins' runtime state (boards + teammates) into a
   git repository and push it to a remote origin so state can be versioned,
   backed up, and rolled back.
 
 .USAGE
   .\scripts\ace-state-init.ps1 <origin-url>
 
-  .\scripts\ace-state-init.ps1 https://github.com/user/paseo-ace-state.git
+  .\scripts\ace-state-init.ps1 https://github.com/user/paseo-aces-state.git
 
 .STATE DIR
   The git repo is created at:
 
-    $env:PASEO_HOME\ace        if PASEO_HOME is set
-    $env:USERPROFILE\.paseo\ace  otherwise
+    $env:PASEO_HOME\aces         if PASEO_HOME is set
+    $env:USERPROFILE\.paseo\aces  otherwise
 
-  Both the `ace-boards` plugin (boards.json) and the `ace-teammates` plugin
+  Both the `aces-boards` plugin (boards.json) and the `aces-teammates` plugin
   (teammates.json + teammates/<slug>/ dirs) live under this directory.
 
 .RECURRING COMMANDS
-  Run these from inside the state dir (cd $env:USERPROFILE\.paseo\ace):
+  Run these from inside the state dir (cd $env:USERPROFILE\.paseo\aces):
 
-    git add -A; git commit -m "ace state snapshot"   # commit the current state
+    git add -A; git commit -m "aces state snapshot"   # commit the current state
     git push                                         # push commits to origin
     git pull --rebase                                # pull remote changes
     git log --oneline                                # inspect history
@@ -35,7 +35,7 @@ param(
 
 if (-not $OriginUrl) {
   Write-Host "Usage: .\scripts\ace-state-init.ps1 <origin-url>"
-  Write-Host "Example: .\scripts\ace-state-init.ps1 https://github.com/user/paseo-ace-state.git"
+  Write-Host "Example: .\scripts\ace-state-init.ps1 https://github.com/user/paseo-aces-state.git"
   exit 1
 }
 
@@ -51,7 +51,7 @@ if ($OriginUrl -notmatch "(://|@|:)") {
 }
 
 $base = if ($env:PASEO_HOME) { $env:PASEO_HOME } else { Join-Path $env:USERPROFILE ".paseo" }
-$stateDir = Join-Path $base "ace"
+$stateDir = Join-Path $base "aces"
 
 if (-not (Test-Path -LiteralPath $stateDir)) {
   New-Item -ItemType Directory -Path $stateDir -Force | Out-Null
@@ -65,11 +65,11 @@ try {
 
   $userName = git config user.name
   if (-not $userName) {
-    git config --local user.name "paseo-ace"
+    git config --local user.name "paseo-aces"
   }
   $userEmail = git config user.email
   if (-not $userEmail) {
-    git config --local user.email "paseo-ace@localhost"
+    git config --local user.email "paseo-aces@localhost"
   }
   git config --local commit.gpgsign false
 
@@ -88,7 +88,7 @@ try {
   }
 
   git add -A
-  git commit -m "ace state snapshot" --no-gpg-sign
+  git commit -m "aces state snapshot" --no-gpg-sign
   if ($LASTEXITCODE -ne 0) {
     Write-Host "No changes to commit; state dir may be empty. Re-run once state exists."
     exit 0

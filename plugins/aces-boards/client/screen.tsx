@@ -116,13 +116,13 @@ export function BoardScreen({ theme, layout, navigation }: PluginScreenProps) {
   const rootRef = useRef<View>(null);
 
   const query = useQuery({
-    queryKey: ["ace", "board", selectedBoardId],
+    queryKey: ["aces-boards", "board", selectedBoardId],
     queryFn: () => getState(selectedBoardId ? { boardId: selectedBoardId } : {}),
     refetchInterval: 3000,
   });
 
   const teammatesQuery = useQuery({
-    queryKey: ["ace", "board-teammates"],
+    queryKey: ["aces-boards", "board-teammates"],
     queryFn: () => getTeammates({}),
     refetchInterval: 3000,
   });
@@ -168,7 +168,7 @@ export function BoardScreen({ theme, layout, navigation }: PluginScreenProps) {
   const activeTeammateIds = new Set(teammatesQuery.data?.active ?? []);
 
   function invalidate() {
-    queryClient.invalidateQueries({ queryKey: ["ace", "board"] });
+    queryClient.invalidateQueries({ queryKey: ["aces-boards", "board"] });
   }
 
   function switchBoard(id: string) {
@@ -869,7 +869,7 @@ function CreateFindCardModal({
   const [prompt, setPrompt] = useState(defaults.prompt ?? "");
   const [projectPickerOpen, setProjectPickerOpen] = useState(false);
 
-  const projectsQuery = useQuery({ queryKey: ["ace", "projects"], queryFn: () => getProjects({}), staleTime: 60000 });
+  const projectsQuery = useQuery({ queryKey: ["aces-boards", "projects"], queryFn: () => getProjects({}), staleTime: 60000 });
   const projects: Project[] = projectsQuery.data?.projects ?? [];
 
   useEffect(() => {
@@ -879,7 +879,7 @@ function CreateFindCardModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projects]);
 
-  const allWorkspacesQuery = useQuery({ queryKey: ["ace", "workspaces"], queryFn: () => getWorkspaces({}) });
+  const allWorkspacesQuery = useQuery({ queryKey: ["aces-boards", "workspaces"], queryFn: () => getWorkspaces({}) });
   const allWorkspaces: WorkspaceCard[] = allWorkspacesQuery.data?.workspaces ?? [];
 
   const [otherPlacements, setOtherPlacements] = useState<Record<string, Record<string, string>>>({});
@@ -1202,14 +1202,14 @@ function ProviderModelSelector({
     return { harness, model, modeId: modeId ?? "", thinkingOptionId: thinkingOptionId ?? "" };
   });
 
-  const providersQuery = useQuery({ queryKey: ["ace", "providers"], queryFn: () => paseo.providers.listAvailable() });
+  const providersQuery = useQuery({ queryKey: ["aces-boards", "providers"], queryFn: () => paseo.providers.listAvailable() });
   const modelsQuery = useQuery({
-    queryKey: ["ace", "models", sel.harness],
+    queryKey: ["aces-boards", "models", sel.harness],
     queryFn: () => paseo.providers.listModels(sel.harness),
     enabled: sel.harness.length > 0,
   });
   const modesQuery = useQuery({
-    queryKey: ["ace", "modes", sel.harness],
+    queryKey: ["aces-boards", "modes", sel.harness],
     queryFn: () => paseo.providers.listModes(sel.harness),
     enabled: sel.harness.length > 0,
   });
@@ -1286,7 +1286,7 @@ function CardDefaultsModal({ theme, defaults, onClose, onSave }: { theme: Plugin
   const [prompt, setPrompt] = useState(defaults?.prompt ?? "");
   const [projectPickerOpen, setProjectPickerOpen] = useState(false);
 
-  const projectsQuery = useQuery({ queryKey: ["ace", "projects"], queryFn: () => getProjects({}), staleTime: 60000 });
+  const projectsQuery = useQuery({ queryKey: ["aces-boards", "projects"], queryFn: () => getProjects({}), staleTime: 60000 });
   const projects: Project[] = projectsQuery.data?.projects ?? [];
 
   useEffect(() => {

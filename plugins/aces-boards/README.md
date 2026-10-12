@@ -1,17 +1,17 @@
-# ace-boards
+# aces-boards
 
 A board of zones for your Paseo workspaces. Move a workspace into a zone to run that zone's prompt, or use zones as status flags.
 
 ## Install
 
 ```
-paseo plugin install github:mogul/paseo-ace:plugins/ace-boards
+paseo plugin install github:mogul/paseo-aces:plugins/aces-boards
 ```
 
 Or from a local checkout:
 
 ```
-paseo plugin install /absolute/path/to/paseo-ace/plugins/ace-boards
+paseo plugin install /absolute/path/to/paseo-aces/plugins/aces-boards
 ```
 
 ## Usage
@@ -55,4 +55,4 @@ npm install
 npm run typecheck
 ```
 
-Board data lives in `~/.paseo/ace/boards.json`.
+Board data lives in `~/.paseo/aces/boards.json`.

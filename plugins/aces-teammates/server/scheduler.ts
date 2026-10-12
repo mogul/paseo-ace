@@ -157,7 +157,7 @@ export class HeartbeatScheduler {
       this.live.set(teammate.id, agent.id);
       this.presence.markActive(teammate.id, agent.id);
     } catch (error) {
-      console.error(`[ace-teammates] heartbeat failed for ${teammate.id}:`, error);
+      console.error(`[aces-teammates] heartbeat failed for ${teammate.id}:`, error);
     }
   }
 }

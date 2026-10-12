@@ -69,12 +69,12 @@ export function TeammatesScreen({ theme, layout, navigation }: PluginScreenProps
   const rootRef = useRef<View>(null);
 
   const query = useQuery({
-    queryKey: ["ace-teammates", "teammates"],
+    queryKey: ["aces-teammates", "teammates"],
     queryFn: () => list({}),
   });
 
   const boardsQuery = useQuery({
-    queryKey: ["ace-teammates", "boards"],
+    queryKey: ["aces-teammates", "boards"],
     queryFn: () => boardsRpc({}),
   });
   const boards: BoardSummary[] = boardsQuery.data?.boards ?? [];
@@ -107,7 +107,7 @@ export function TeammatesScreen({ theme, layout, navigation }: PluginScreenProps
   const teammates = query.data?.teammates ?? [];
 
   function invalidate() {
-    queryClient.invalidateQueries({ queryKey: ["ace-teammates", "teammates"] });
+    queryClient.invalidateQueries({ queryKey: ["aces-teammates", "teammates"] });
   }
 
   async function handleCreate(input: { name: string; description?: string; provider?: string; boardId?: string; boardName?: string; heartbeatCron?: string; persona?: string; emoji?: string }) {
@@ -391,14 +391,14 @@ function ProviderCombobox({ theme, value, onChange }: { theme: PluginTheme; valu
   const blurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const providersQuery = useQuery({
-    queryKey: ["ace-teammates", "providers"],
+    queryKey: ["aces-teammates", "providers"],
     queryFn: () => paseo.providers.listAvailable(),
     staleTime: 60000,
   });
   const harnesses = useMemo(() => (providersQuery.data?.providers ?? []).map((p) => p.provider), [providersQuery.data]);
   const modelQueries = useQueries({
     queries: harnesses.map((h) => ({
-      queryKey: ["ace-teammates", "models", h],
+      queryKey: ["aces-teammates", "models", h],
       queryFn: () => paseo.providers.listModels(h),
       staleTime: 60000,
     })),
@@ -593,7 +593,7 @@ function StartModal({ theme, teammate, onClose, onStart }: { theme: PluginTheme;
   const c = theme.colors;
   const paseo = usePaseo();
   const workspacesQuery = useQuery({
-    queryKey: ["ace-teammates", "workspaces"],
+    queryKey: ["aces-teammates", "workspaces"],
     queryFn: async () => (await paseo.workspaces.list()).entries,
   });
   const workspaces = (workspacesQuery.data ?? []).filter((w) => !w.archivingAt);

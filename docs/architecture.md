@@ -1,7 +1,7 @@
 # Architecture
 
-`ace-boards` is the boards plugin in the ACE suite — an Agor-style, multi-board
-workspace board. Its sibling, `ace-teammates`, handles persistent teammates and
+`aces-boards` is the boards plugin in the aces suite — an Agor-style, multi-board
+workspace board. Its sibling, `aces-teammates`, handles persistent teammates and
 memory. This is the canonical, current-state summary; decisions are recorded in
 `docs/decisions/`.
 
@@ -9,7 +9,7 @@ memory. This is the canonical, current-state summary; decisions are recorded in
 
 1. **Build on Paseo, don't reimplement it.** Paseo provides the multi-agent
    harness, multi-provider, worktrees, schedules, and orchestration MCP tools.
-   `ace-boards` adds a board surface and a small MCP bridge; there is no
+   `aces-boards` adds a board surface and a small MCP bridge; there is no
    workflow/DAG engine.
 2. **Zones are the whole feature.** A zone has an optional prompt; dropping a
    workspace card into it runs that prompt. A zone with no prompt is a status
@@ -27,7 +27,7 @@ droppable regions (arranged in columns). Agor's "Cards (beta)" is unrelated.
 
 ## Data model
 
-`~/.paseo/ace/boards.json`:
+`~/.paseo/aces/boards.json`:
 
 ```json
 {
@@ -64,7 +64,7 @@ optional initial agent).
 ## Board MCP (for agents)
 
 Hand-rolled JSON-RPC-over-HTTP server on `127.0.0.1:0`, injected via
-`before("agent.create")` as `mcpServers["ace-boards"]`. Tools: `board_list` (current board +
+`before("agent.create")` as `mcpServers["aces-boards"]`. Tools: `board_list` (current board +
 workspaces + board summaries) and `board_move_card(workspaceId, zoneId, boardId?)`.
 Action-firing is implicit in the move — there is no `run_action`.
 

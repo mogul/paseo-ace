@@ -1,11 +1,9 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
-import type { Board, BoardSummary, WorkspaceCard } from "../shared/contracts";
 
 export interface McpHandlers {
-  getCurrentBoard: () => Board;
-  listBoards: () => BoardSummary[];
-  moveCard: (workspaceId: string, zoneId: string, boardId?: string) => Promise<{ ok: boolean; error?: string }>;
-  buildWorkspaces: () => Promise<WorkspaceCard[]>;
+  listTeammates: () => { id: string; name: string }[];
+  appendMemory: (teammate: string, text: string) => void;
+  readMemory: (teammate: string, days?: number) => string;
 }
 
 interface JsonRpcRequest {
@@ -17,17 +15,26 @@ interface JsonRpcRequest {
 
 const TOOLS = [
   {
-    name: "board_list",
-    description: "List the board columns, zones, and workspace cards.",
+    name: "teammate_list",
+    description: "List the teammates.",
     inputSchema: { type: "object", properties: {} },
   },
   {
-    name: "board_move_card",
-    description: "Move a workspace card into a zone.",
+    name: "teammate_memory_append",
+    description: "Append a note to a teammate's memory.",
     inputSchema: {
       type: "object",
-      properties: { workspaceId: { type: "string" }, zoneId: { type: "string" }, boardId: { type: "string" } },
-      required: ["workspaceId", "zoneId"],
+      properties: { teammate: { type: "string" }, text: { type: "string" } },
+      required: ["teammate", "text"],
+    },
+  },
+  {
+    name: "teammate_memory_read",
+    description: "Read a teammate's recent memory.",
+    inputSchema: {
+      type: "object",
+      properties: { teammate: { type: "string" }, days: { type: "number" } },
+      required: ["teammate"],
     },
   },
 ];
@@ -51,7 +58,7 @@ export class McpServer {
       if (address && typeof address === "object") {
         this.port = address.port;
       }
-      console.log(`[ace] MCP server listening at ${this.url()}`);
+      console.log(`[aces-teammates] MCP server listening at ${this.url()}`);
     });
   }
 
@@ -98,7 +105,7 @@ export class McpServer {
         this.respond(res, id, {
           protocolVersion: "2024-11-05",
           capabilities: { tools: {} },
-          serverInfo: { name: "ace-boards", version: "0.1.0" },
+          serverInfo: { name: "aces-teammates", version: "0.1.0" },
         });
         return;
       case "tools/list":
@@ -123,29 +130,40 @@ export class McpServer {
     const name = params?.name;
     const args = params?.arguments ?? {};
 
-    if (name === "board_list") {
+    if (name === "teammate_list") {
       try {
-        const board = handlers.getCurrentBoard();
-        const boards = handlers.listBoards();
-        const workspaces = await handlers.buildWorkspaces();
-        this.toolResult(res, id, { board, boards, workspaces });
+        this.toolResult(res, id, { teammates: handlers.listTeammates() });
       } catch (error) {
         this.toolError(res, id, error);
       }
       return;
     }
 
-    if (name === "board_move_card") {
-      const workspaceId = args.workspaceId;
-      const zoneId = args.zoneId;
-      const boardId = typeof args.boardId === "string" ? args.boardId : undefined;
-      if (typeof workspaceId !== "string" || typeof zoneId !== "string") {
-        this.toolError(res, id, new Error("workspaceId and zoneId are required string arguments."));
+    if (name === "teammate_memory_append") {
+      const teammate = args.teammate;
+      const text = args.text;
+      if (typeof teammate !== "string" || typeof text !== "string") {
+        this.toolError(res, id, new Error("teammate and text are required string arguments."));
         return;
       }
       try {
-        const result = await handlers.moveCard(workspaceId, zoneId, boardId);
-        this.toolResult(res, id, result);
+        handlers.appendMemory(teammate, text);
+        this.toolResult(res, id, { ok: true });
+      } catch (error) {
+        this.toolError(res, id, error);
+      }
+      return;
+    }
+
+    if (name === "teammate_memory_read") {
+      const teammate = args.teammate;
+      if (typeof teammate !== "string") {
+        this.toolError(res, id, new Error("teammate is a required string argument."));
+        return;
+      }
+      const days = typeof args.days === "number" ? args.days : undefined;
+      try {
+        this.toolResult(res, id, { memory: handlers.readMemory(teammate, days) });
       } catch (error) {
         this.toolError(res, id, error);
       }

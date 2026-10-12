@@ -3,19 +3,19 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import type { BoardTeammate } from "../shared/contracts";
 
-// Read-only coupling to the `ace-teammates` plugin's state via the filesystem
-// contract (the same way ace-teammates reads ace's boards.json). We read
+// Read-only coupling to the `aces-teammates` plugin's state via the filesystem
+// contract (the same way aces-teammates reads ace's boards.json). We read
 // teammates.json for the teammate roster and active.json for the currently
-// running set. Treat ace-teammates' file shapes as the contract and never write
+// running set. Treat aces-teammates' file shapes as the contract and never write
 // to them from here.
 
-function aceBaseDir(): string {
+function acesBaseDir(): string {
   const base = process.env.PASEO_HOME || join(homedir(), ".paseo");
-  return join(base, "ace");
+  return join(base, "aces");
 }
 
 export function readBoardTeammates(): { teammates: BoardTeammate[]; active: string[] } {
-  const dir = aceBaseDir();
+  const dir = acesBaseDir();
   const teammates: BoardTeammate[] = [];
 
   try {

@@ -42,6 +42,11 @@ const DEFAULT_BOARDS: BoardsData = {
 
 function dataDir(): string {
   const base = process.env.PASEO_HOME || join(homedir(), ".paseo");
+  return join(base, "aces");
+}
+
+function previousDataDir(): string {
+  const base = process.env.PASEO_HOME || join(homedir(), ".paseo");
   return join(base, "ace");
 }
 
@@ -50,17 +55,21 @@ function legacyDataDir(): string {
   return join(base, "plugins", "ace");
 }
 
-// One-time migration from the pre-consolidation layout (board state lived under
-// ~/.paseo/plugins/ace) to the shared ~/.paseo/ace directory. The legacy files
-// are copied, never deleted.
+// One-time migration chain: prefer the new ~/.paseo/aces directory; if its
+// boards.json is missing, copy it over from the previous ~/.paseo/ace location,
+// then from the pre-consolidation ~/.paseo/plugins/ace location. Files are
+// copied, never deleted.
 function migrate(): void {
   const dir = dataDir();
   const path = join(dir, "boards.json");
   if (existsSync(path)) return;
-  const legacy = join(legacyDataDir(), "boards.json");
-  if (!existsSync(legacy)) return;
-  mkdirSync(dir, { recursive: true });
-  copyFileSync(legacy, path);
+  const sources = [join(previousDataDir(), "boards.json"), join(legacyDataDir(), "boards.json")];
+  for (const source of sources) {
+    if (!existsSync(source)) continue;
+    mkdirSync(dir, { recursive: true });
+    copyFileSync(source, path);
+    return;
+  }
 }
 
 export class BoardStore {

@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
 #
-# One-shot setup: put the ACE plugins' runtime state (boards + teammates) into a
+# One-shot setup: put the aces plugins' runtime state (boards + teammates) into a
 # git repository and push it to a remote origin so state can be versioned,
 # backed up, and rolled back.
 #
 # Usage:
 #   ./scripts/ace-state-init.sh <origin-url>
-#   ./scripts/ace-state-init.sh https://github.com/user/paseo-ace-state.git
+#   ./scripts/ace-state-init.sh https://github.com/user/paseo-aces-state.git
 #
 # State dir (the git repo):
-#   "$PASEO_HOME/ace"        if PASEO_HOME is set
-#   "$HOME/.paseo/ace"       otherwise
+#   "$PASEO_HOME/aces"       if PASEO_HOME is set
+#   "$HOME/.paseo/aces"      otherwise
 #
-# Both the `ace-boards` plugin (boards.json) and the `ace-teammates` plugin
+# Both the `aces-boards` plugin (boards.json) and the `aces-teammates` plugin
 # (teammates.json + teammates/<slug>/ dirs) live under this directory.
 #
-# Recurring commands (run from inside the state dir, i.e. cd "$HOME/.paseo/ace"):
-#   git add -A; git commit -m "ace state snapshot"   # commit the current state
+# Recurring commands (run from inside the state dir, i.e. cd "$HOME/.paseo/aces"):
+#   git add -A; git commit -m "aces state snapshot"   # commit the current state
 #   git push                                         # push commits to origin
 #   git pull --rebase                                # pull remote changes
 #   git log --oneline                                # inspect history
@@ -27,7 +27,7 @@ set -uo pipefail
 if [ "$#" -ne 1 ]; then
   echo "Error: expected exactly one argument (the origin URL)." >&2
   echo "Usage: ./scripts/ace-state-init.sh <origin-url>" >&2
-  echo "Example: ./scripts/ace-state-init.sh https://github.com/user/paseo-ace-state.git" >&2
+  echo "Example: ./scripts/ace-state-init.sh https://github.com/user/paseo-aces-state.git" >&2
   exit 1
 fi
 ORIGIN_URL="$1"
@@ -45,7 +45,7 @@ if [[ ! "$ORIGIN_URL" =~ (://|@|:) ]]; then
 fi
 
 BASE="${PASEO_HOME:-$HOME/.paseo}"
-STATE_DIR="$BASE/ace"
+STATE_DIR="$BASE/aces"
 
 mkdir -p "$STATE_DIR"
 cd "$STATE_DIR" || exit 1
@@ -55,10 +55,10 @@ if [ ! -d .git ]; then
 fi
 
 if [ -z "$(git config user.name)" ]; then
-  git config --local user.name "paseo-ace"
+  git config --local user.name "paseo-aces"
 fi
 if [ -z "$(git config user.email)" ]; then
-  git config --local user.email "paseo-ace@localhost"
+  git config --local user.email "paseo-aces@localhost"
 fi
 git config --local commit.gpgsign false
 
@@ -68,7 +68,7 @@ if ! grep -qx "active.json" .gitignore 2>/dev/null; then
 fi
 
 git add -A
-if git commit --no-gpg-sign -m "ace state snapshot"; then
+if git commit --no-gpg-sign -m "aces state snapshot"; then
   : # committed
 else
   echo "No changes to commit; the state dir may be empty. Re-run once state exists."

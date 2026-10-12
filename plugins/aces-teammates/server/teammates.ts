@@ -91,6 +91,11 @@ function seedFiles(personaId: string | undefined, name: string): { soul: string;
 
 function baseDir(): string {
   const base = process.env.PASEO_HOME || join(homedir(), ".paseo");
+  return join(base, "aces");
+}
+
+function previousBaseDir(): string {
+  const base = process.env.PASEO_HOME || join(homedir(), ".paseo");
   return join(base, "ace");
 }
 
@@ -113,33 +118,35 @@ function copyDirRecursive(src: string, dest: string): void {
   }
 }
 
-// One-time migration from the pre-consolidation layout (teammate state lived
-// under ~/.paseo/plugins/ace-teammates) to the shared ~/.paseo/ace directory.
-// The legacy files are copied, never deleted.
+// One-time migration chain: prefer the new ~/.paseo/aces directory; if its
+// teammates.json / teammates/ are missing, copy them over from the previous
+// ~/.paseo/ace location, then from the pre-consolidation
+// ~/.paseo/plugins/ace-teammates location. Legacy files are copied, never
+// deleted.
 function migrate(): void {
   const dir = baseDir();
   const indexPath = join(dir, "teammates.json");
-  const legacy = legacyBaseDir();
-  const legacyIndex = join(legacy, "teammates.json");
-  const legacyTeammatesDir = join(legacy, "teammates");
-
-  if (!existsSync(indexPath) && existsSync(legacyIndex)) {
-    mkdirSync(dir, { recursive: true });
-    copyFileSync(legacyIndex, indexPath);
-  }
-
   const teammatesDir = join(dir, "teammates");
-  if (!existsSync(teammatesDir) && existsSync(legacyTeammatesDir)) {
-    copyDirRecursive(legacyTeammatesDir, teammatesDir);
+
+  for (const source of [previousBaseDir(), legacyBaseDir()]) {
+    const sourceIndex = join(source, "teammates.json");
+    if (!existsSync(indexPath) && existsSync(sourceIndex)) {
+      mkdirSync(dir, { recursive: true });
+      copyFileSync(sourceIndex, indexPath);
+    }
+    const sourceTeammatesDir = join(source, "teammates");
+    if (!existsSync(teammatesDir) && existsSync(sourceTeammatesDir)) {
+      copyDirRecursive(sourceTeammatesDir, teammatesDir);
+    }
   }
 }
 
-// Read-only coupling to the `ace-boards` plugin's board store. This is the only touch
+// Read-only coupling to the `aces-boards` plugin's board store. This is the only touch
 // point between the two plugins; treat ace's BoardsData schema as the contract
 // and never write to it from here.
-export function readAceBoards(): BoardSummary[] {
+export function readBoards(): BoardSummary[] {
   const base = process.env.PASEO_HOME || join(homedir(), ".paseo");
-  const path = join(base, "ace", "boards.json");
+  const path = join(base, "aces", "boards.json");
   try {
     if (!existsSync(path)) return [];
     const parsed = JSON.parse(readFileSync(path, "utf8")) as { boards?: unknown };
@@ -344,7 +351,7 @@ export function buildSystemPrompt(store: TeammateStore, id: string): { name: str
   const user = store.readText(id, "USER.md");
   const memory = store.readMemory(id, 7);
   const systemPrompt =
-    `You are the ACE teammate named ${teammate.name}.\n\n` +
+    `You are the teammate named ${teammate.name}.\n\n` +
     `${identity}\n${soul}\n${user}\n\n` +
     `Recent memory:\n${memory}\n\n` +
     `You may append what you learn to your memory using the teammate_memory_append tool with teammate = "${teammate.id}". You are "${teammate.id}".`;

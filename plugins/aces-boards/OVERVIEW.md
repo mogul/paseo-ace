@@ -1,6 +1,6 @@
-# ACE Boards
+# Boards
 
-ACE Boards is a board of zones for your Paseo workspaces. Each workspace is a card showing its branch, pull request, issue pills, and a live session tree. Move a card into a zone to run that zone's prompt, or use zones as status flags. Multiple boards, per-board card defaults, and a board MCP let you and your agents organize and drive the work.
+Boards is a board of zones for your Paseo workspaces. Each workspace is a card showing its branch, pull request, issue pills, and a live session tree. Move a card into a zone to run that zone's prompt, or use zones as status flags. Multiple boards, per-board card defaults, and a board MCP let you and your agents organize and drive the work.
 
 ## How it works
 
@@ -8,7 +8,7 @@ The board is a single screen in the Paseo sidebar, on desktop, web, and mobile. 
 
 ## Setup
 
-Requires Paseo 0.11.2 or later. The daemon machine needs the providers referenced by zone prompts and card defaults available. Board data lives under `~/.paseo/ace/` (or `$PASEO_HOME/ace/`), shared with the `ace-teammates` plugin and git-versionable.
+Requires Paseo 0.11.2 or later. The daemon machine needs the providers referenced by zone prompts and card defaults available. Board data lives under `~/.paseo/aces/` (or `$PASEO_HOME/aces/`), shared with the `aces-teammates` plugin and git-versionable.
 
 ## Boards, zones, and cards
 

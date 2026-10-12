@@ -1,17 +1,17 @@
-# ace-teammates
+# aces-teammates
 
 Persistent AI teammates for Paseo: stable identity and file memory, a persona gallery, and a memory MCP. Give a teammate a board and a heartbeat to make a supervisor.
 
 ## Install
 
 ```
-paseo plugin install github:mogul/paseo-ace:plugins/ace-teammates
+paseo plugin install github:mogul/paseo-aces:plugins/aces-teammates
 ```
 
 Or from a local checkout:
 
 ```
-paseo plugin install /absolute/path/to/paseo-ace/plugins/ace-teammates
+paseo plugin install /absolute/path/to/paseo-aces/plugins/aces-teammates
 ```
 
 ## Usage
@@ -29,7 +29,7 @@ Agents get `teammate_list`, `teammate_memory_append`, and `teammate_memory_read`
 ## Data model
 
 ```
-~/.paseo/ace/
+~/.paseo/aces/
   teammates.json
   teammates/<slug>/
     SOUL.md

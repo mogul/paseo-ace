@@ -2,15 +2,15 @@ import { mkdirSync, renameSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-// Ephemeral "who is currently running" state, shared with the `ace-boards` board via a
-// filesystem contract (ace reads active.json the same way ace-teammates reads
+// Ephemeral "who is currently running" state, shared with the `aces-boards` board via a
+// filesystem contract (ace reads active.json the same way aces-teammates reads
 // boards.json). It is NOT part of the state repo's git history — see
 // scripts/ace-state-init.ps1, which git-ignores active.json. It may go stale if
 // the daemon restarts mid-run, which is acceptable for a presence indicator.
 
-function aceBaseDir(): string {
+function acesBaseDir(): string {
   const base = process.env.PASEO_HOME || join(homedir(), ".paseo");
-  return join(base, "ace");
+  return join(base, "aces");
 }
 
 export class PresenceTracker {
@@ -21,7 +21,7 @@ export class PresenceTracker {
   private readonly activePath: string;
 
   constructor() {
-    this.activePath = join(aceBaseDir(), "active.json");
+    this.activePath = join(acesBaseDir(), "active.json");
   }
 
   markActive(teammateId: string, agentId: string): void {
@@ -41,12 +41,12 @@ export class PresenceTracker {
       active[teammateId] = true;
     }
     try {
-      mkdirSync(aceBaseDir(), { recursive: true });
+      mkdirSync(acesBaseDir(), { recursive: true });
       const tmp = this.activePath + ".tmp";
       writeFileSync(tmp, JSON.stringify(active, null, 2), "utf8");
       renameSync(tmp, this.activePath);
     } catch (error) {
-      console.error("[ace-teammates] failed to persist active.json:", error);
+      console.error("[aces-teammates] failed to persist active.json:", error);
     }
   }
 }

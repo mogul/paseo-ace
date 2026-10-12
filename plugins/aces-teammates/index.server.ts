@@ -11,7 +11,7 @@ import {
 import { McpServer } from "./server/mcp";
 import { PresenceTracker } from "./server/presence";
 import { HeartbeatScheduler } from "./server/scheduler";
-import { buildSystemPrompt, readAceBoards, TeammateStore } from "./server/teammates";
+import { buildSystemPrompt, readBoards, TeammateStore } from "./server/teammates";
 
 export default function contribute(server: PluginServerContext) {
   const store = new TeammateStore();
@@ -41,7 +41,7 @@ export default function contribute(server: PluginServerContext) {
         ...request.config,
         mcpServers: {
           ...request.config.mcpServers,
-          "ace-teammates": { type: "http", url: mcpServer.url(), alwaysLoad: true },
+          "aces-teammates": { type: "http", url: mcpServer.url(), alwaysLoad: true },
         },
       },
     };
@@ -49,7 +49,7 @@ export default function contribute(server: PluginServerContext) {
 
   server.handle(teammateListRpc, () => ({ teammates: store.list() }));
 
-  server.handle(teammateBoardsRpc, () => ({ boards: readAceBoards() }));
+  server.handle(teammateBoardsRpc, () => ({ boards: readBoards() }));
 
   server.handle(teammateCreateRpc, ({ name, description, provider, boardId, boardName, heartbeatCron, persona, emoji }) => ({
     teammate: store.create(name, description, provider, boardId, boardName, heartbeatCron, persona, emoji),
