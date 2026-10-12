@@ -2,6 +2,7 @@ import { appendFileSync, copyFileSync, existsSync, mkdirSync, readFileSync, read
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { BoardSummary, Teammate } from "../shared/contracts";
+import { getPersona } from "../shared/personas";
 
 interface TeammateRecord {
   id: string;
@@ -11,6 +12,8 @@ interface TeammateRecord {
   boardId?: string;
   boardName?: string;
   heartbeatCron?: string;
+  persona?: string;
+  emoji?: string;
   createdAt: string;
 }
 
@@ -28,6 +31,18 @@ const HEARTBEAT_SEED =
 
 function identitySeed(name: string): string {
   return `# Identity\n\nName: ${name}\n\n(purpose)`;
+}
+
+// File seeds for a new teammate. When a persona id is given, SOUL/IDENTITY/USER
+// come from that persona's content (the blank persona is the default). To keep
+// the blank starter's original generic shape, only the blank identity is
+// templated with the teammate name.
+function seedFiles(personaId: string | undefined, name: string): { soul: string; identity: string; user: string } {
+  const persona = getPersona(personaId);
+  if (persona.id === "blank") {
+    return { soul: SOUL_SEED, identity: identitySeed(name), user: USER_SEED };
+  }
+  return { soul: persona.soul, identity: persona.identity, user: persona.user };
 }
 
 function baseDir(): string {
@@ -156,7 +171,7 @@ export class TeammateStore {
     return join(this.teammatesDir, id);
   }
 
-  create(name: string, description?: string, provider?: string, boardId?: string, boardName?: string, heartbeatCron?: string): Teammate {
+  create(name: string, description?: string, provider?: string, boardId?: string, boardName?: string, heartbeatCron?: string, persona?: string, emoji?: string): Teammate {
     const base = slugify(name);
     if (!base) throw new Error("Name must include at least one letter or number.");
     const id = this.uniqueSlug(base);
@@ -168,14 +183,17 @@ export class TeammateStore {
       boardId: boardId?.trim() || undefined,
       boardName: boardName?.trim() || undefined,
       heartbeatCron: heartbeatCron?.trim() || undefined,
+      persona: persona?.trim() || undefined,
+      emoji: emoji?.trim() || undefined,
       createdAt: new Date().toISOString(),
     };
 
+    const seed = seedFiles(persona, name);
     const dir = this.memoryPath(id);
     mkdirSync(join(dir, "memory"), { recursive: true });
-    writeFileSync(join(dir, "SOUL.md"), SOUL_SEED, "utf8");
-    writeFileSync(join(dir, "USER.md"), USER_SEED, "utf8");
-    writeFileSync(join(dir, "IDENTITY.md"), identitySeed(name), "utf8");
+    writeFileSync(join(dir, "SOUL.md"), seed.soul, "utf8");
+    writeFileSync(join(dir, "USER.md"), seed.user, "utf8");
+    writeFileSync(join(dir, "IDENTITY.md"), seed.identity, "utf8");
     writeFileSync(join(dir, "BOARD.md"), BOARD_SEED, "utf8");
     writeFileSync(join(dir, "HEARTBEAT.md"), HEARTBEAT_SEED, "utf8");
 
@@ -184,12 +202,14 @@ export class TeammateStore {
     return this.toTeammate(record);
   }
 
-  rename(id: string, name: string, boardId?: string, boardName?: string, heartbeatCron?: string): Teammate {
+  rename(id: string, name: string, boardId?: string, boardName?: string, heartbeatCron?: string, persona?: string, emoji?: string): Teammate {
     const record = this.record(id);
     record.name = name;
     record.boardId = boardId?.trim() || undefined;
     record.boardName = boardName?.trim() || undefined;
     record.heartbeatCron = heartbeatCron?.trim() || undefined;
+    if (persona !== undefined) record.persona = persona.trim() || undefined;
+    record.emoji = emoji?.trim() || undefined;
     this.persist();
     return this.toTeammate(record);
   }

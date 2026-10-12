@@ -15,6 +15,13 @@ import {
   type BoardSummary,
   type Teammate,
 } from "../shared/contracts";
+import { PERSONAS } from "../shared/personas";
+
+const EMOJI_CHOICES = [
+  "🤖", "🧊", "🗂️", "🔍", "📋", "🧠", "🛠️", "🚀",
+  "👨💻", "🔐", "🎨", "📊", "👔", "🧪", "🔬", "⚙️",
+  "🧹", "📦", "🔎", "🧯", "🕵️", "🧑🔬", "🤝", "✨",
+];
 
 type Overlay =
   | { kind: "new" }
@@ -94,7 +101,7 @@ export function TeammatesScreen({ theme, layout, navigation }: PluginScreenProps
     queryClient.invalidateQueries({ queryKey: ["ace-teammates", "teammates"] });
   }
 
-  async function handleCreate(input: { name: string; description?: string; provider?: string; boardId?: string; boardName?: string; heartbeatCron?: string }) {
+  async function handleCreate(input: { name: string; description?: string; provider?: string; boardId?: string; boardName?: string; heartbeatCron?: string; persona?: string; emoji?: string }) {
     try {
       await create(input);
     } catch (err) {
@@ -105,9 +112,9 @@ export function TeammatesScreen({ theme, layout, navigation }: PluginScreenProps
     setOverlay(null);
   }
 
-  async function handleRename(teammate: Teammate, name: string, boardId?: string, boardName?: string, heartbeatCron?: string) {
+  async function handleRename(teammate: Teammate, name: string, boardId?: string, boardName?: string, heartbeatCron?: string, emoji?: string) {
     try {
-      await rename({ id: teammate.id, name, boardId, boardName, heartbeatCron });
+      await rename({ id: teammate.id, name, boardId, boardName, heartbeatCron, emoji });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : String(err));
       return;
@@ -188,7 +195,7 @@ export function TeammatesScreen({ theme, layout, navigation }: PluginScreenProps
           teammates.map((t) => (
             <View key={t.id} style={styles.card}>
               <View style={styles.cardHeader}>
-                <Text style={styles.cardName}>{t.name}</Text>
+                <Text style={styles.cardName}>{t.emoji ? `${t.emoji} ${t.name}` : t.name}</Text>
                 <Pressable accessibilityRole="button" accessibilityLabel={`${t.name} menu`} onPress={(e) => openMenu(e, t)}>
                   <Text style={styles.dots}>⋯</Text>
                 </Pressable>
@@ -258,8 +265,8 @@ function OverlayView({
   theme: PluginTheme;
   boards: BoardSummary[];
   onClose: () => void;
-  onCreate: (input: { name: string; description?: string; provider?: string; boardId?: string; boardName?: string; heartbeatCron?: string }) => void;
-  onRename: (teammate: Teammate, name: string, boardId?: string, boardName?: string, heartbeatCron?: string) => void;
+  onCreate: (input: { name: string; description?: string; provider?: string; boardId?: string; boardName?: string; heartbeatCron?: string; persona?: string; emoji?: string }) => void;
+  onRename: (teammate: Teammate, name: string, boardId?: string, boardName?: string, heartbeatCron?: string, emoji?: string) => void;
   onDelete: (teammate: Teammate) => void;
   onStart: (teammate: Teammate, workspaceId?: string) => void;
 }) {
@@ -328,13 +335,94 @@ function BoardPicker({
   );
 }
 
-function NewTeammateModal({ theme, boards, onClose, onCreate }: { theme: PluginTheme; boards: BoardSummary[]; onClose: () => void; onCreate: (input: { name: string; description?: string; provider?: string; boardId?: string; boardName?: string; heartbeatCron?: string }) => void }) {
+function EmojiPicker({ theme, value, onChange }: { theme: PluginTheme; value?: string; onChange: (emoji: string) => void }) {
+  const c = theme.colors;
+  return (
+    <View style={{ gap: 6 }}>
+      <Text style={labelStyle(c)}>Emoji</Text>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+        {EMOJI_CHOICES.map((e) => {
+          const selected = value === e;
+          return (
+            <Pressable
+              key={e}
+              accessibilityRole="button"
+              accessibilityLabel={`Emoji ${e}`}
+              onPress={() => onChange(e)}
+              style={{
+                width: 36,
+                height: 36,
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: 8,
+                borderWidth: 1,
+                borderColor: selected ? c.accent : c.border,
+                backgroundColor: selected ? c.accent : c.surface1,
+              }}
+            >
+              <Text style={{ fontSize: 18 }}>{e}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+function PersonaPicker({ theme, value, onChange }: { theme: PluginTheme; value?: string; onChange: (id: string) => void }) {
+  const c = theme.colors;
+  return (
+    <View style={{ gap: 6 }}>
+      <Text style={labelStyle(c)}>Persona</Text>
+      <HostScrollView style={{ maxHeight: 200 }}>
+        <View style={{ gap: 6 }}>
+          {PERSONAS.map((p) => {
+            const selected = value === p.id;
+            return (
+              <Pressable
+                key={p.id}
+                accessibilityRole="button"
+                accessibilityLabel={`Persona ${p.name}`}
+                onPress={() => onChange(p.id)}
+                style={{ flexDirection: "row", gap: 8, alignItems: "center", padding: 8, borderRadius: 8, borderWidth: 1, borderColor: selected ? c.accent : c.border, backgroundColor: selected ? c.accent : c.surface1 }}
+              >
+                <Text style={{ fontSize: 16 }}>{p.emoji}</Text>
+                <View style={{ flex: 1, gap: 1 }}>
+                  <Text style={{ color: selected ? c.accentForeground : c.foreground, fontWeight: "600", fontSize: 13 }}>{p.name}</Text>
+                  <Text style={{ color: selected ? c.accentForeground : c.foregroundMuted, fontSize: 11 }}>{p.description}</Text>
+                </View>
+              </Pressable>
+            );
+          })}
+        </View>
+      </HostScrollView>
+    </View>
+  );
+}
+
+function NewTeammateModal({ theme, boards, onClose, onCreate }: { theme: PluginTheme; boards: BoardSummary[]; onClose: () => void; onCreate: (input: { name: string; description?: string; provider?: string; boardId?: string; boardName?: string; heartbeatCron?: string; persona?: string; emoji?: string }) => void }) {
   const c = theme.colors;
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [provider, setProvider] = useState("");
   const [boardId, setBoardId] = useState<string | undefined>(undefined);
   const [heartbeatCron, setHeartbeatCron] = useState("");
+  const [personaId, setPersonaId] = useState(PERSONAS[0].id);
+  const [emoji, setEmoji] = useState<string | undefined>(PERSONAS[0].emoji);
+  const [emojiTouched, setEmojiTouched] = useState(false);
+
+  function selectEmoji(e: string) {
+    setEmoji(e);
+    setEmojiTouched(true);
+  }
+
+  function selectPersona(id: string) {
+    setPersonaId(id);
+    if (!emojiTouched) {
+      const persona = PERSONAS.find((p) => p.id === id);
+      if (persona) setEmoji(persona.emoji);
+    }
+  }
 
   return (
     <Modal title="New teammate" open onOpenChange={(o) => { if (!o) onClose(); }}>
@@ -345,6 +433,8 @@ function NewTeammateModal({ theme, boards, onClose, onCreate }: { theme: PluginT
         <HostTextInput value={description} onChangeText={setDescription} style={inputStyle(c)} />
         <Text style={labelStyle(c)}>Provider</Text>
         <HostTextInput value={provider} onChangeText={setProvider} style={inputStyle(c)} autoCapitalize="none" autoCorrect={false} placeholder="opencode/opencode-go/deepseek-v4-flash" placeholderTextColor={c.foregroundMuted} />
+        <PersonaPicker theme={theme} value={personaId} onChange={selectPersona} />
+        <EmojiPicker theme={theme} value={emoji} onChange={selectEmoji} />
         <BoardPicker theme={theme} boards={boards} value={boardId} onChange={setBoardId} />
         <Text style={labelStyle(c)}>Heartbeat (cron)</Text>
         <HostTextInput value={heartbeatCron} onChangeText={setHeartbeatCron} style={inputStyle(c)} autoCapitalize="none" autoCorrect={false} placeholder="0 9 * * 1-5" placeholderTextColor={c.foregroundMuted} />
@@ -355,7 +445,7 @@ function NewTeammateModal({ theme, boards, onClose, onCreate }: { theme: PluginT
           <Pressable
             accessibilityRole="button"
             disabled={!name.trim()}
-            onPress={() => onCreate({ name: name.trim(), description: description.trim() || undefined, provider: provider.trim() || undefined, boardId, boardName: boards.find((b) => b.id === boardId)?.name, heartbeatCron: heartbeatCron.trim() || undefined })}
+            onPress={() => onCreate({ name: name.trim(), description: description.trim() || undefined, provider: provider.trim() || undefined, boardId, boardName: boards.find((b) => b.id === boardId)?.name, heartbeatCron: heartbeatCron.trim() || undefined, persona: personaId, emoji: emoji?.trim() })}
             style={{ padding: 8, borderRadius: 8, backgroundColor: c.accent, opacity: name.trim() ? 1 : 0.4 }}
           >
             <Text style={{ color: c.accentForeground, fontWeight: "600" }}>Create</Text>
@@ -396,17 +486,19 @@ function StartModal({ theme, teammate, onClose, onStart }: { theme: PluginTheme;
   );
 }
 
-function RenameModal({ theme, teammate, boards, onClose, onRename }: { theme: PluginTheme; teammate: Teammate; boards: BoardSummary[]; onClose: () => void; onRename: (teammate: Teammate, name: string, boardId?: string, boardName?: string, heartbeatCron?: string) => void }) {
+function RenameModal({ theme, teammate, boards, onClose, onRename }: { theme: PluginTheme; teammate: Teammate; boards: BoardSummary[]; onClose: () => void; onRename: (teammate: Teammate, name: string, boardId?: string, boardName?: string, heartbeatCron?: string, emoji?: string) => void }) {
   const c = theme.colors;
   const [name, setName] = useState(teammate.name);
   const [boardId, setBoardId] = useState<string | undefined>(teammate.boardId);
   const [heartbeatCron, setHeartbeatCron] = useState(teammate.heartbeatCron ?? "");
+  const [emoji, setEmoji] = useState<string | undefined>(teammate.emoji);
 
   return (
     <Modal title="Rename teammate" open onOpenChange={(o) => { if (!o) onClose(); }}>
       <Modal.Content contentContainerStyle={{ gap: 12 }}>
         <Text style={labelStyle(c)}>Name</Text>
         <HostTextInput value={name} onChangeText={setName} style={inputStyle(c)} autoFocus />
+        <EmojiPicker theme={theme} value={emoji} onChange={setEmoji} />
         <BoardPicker theme={theme} boards={boards} value={boardId} onChange={setBoardId} />
         <Text style={labelStyle(c)}>Heartbeat (cron)</Text>
         <HostTextInput value={heartbeatCron} onChangeText={setHeartbeatCron} style={inputStyle(c)} autoCapitalize="none" autoCorrect={false} placeholder="0 9 * * 1-5" placeholderTextColor={c.foregroundMuted} />
@@ -417,7 +509,7 @@ function RenameModal({ theme, teammate, boards, onClose, onRename }: { theme: Pl
           <Pressable
             accessibilityRole="button"
             disabled={!name.trim()}
-            onPress={() => onRename(teammate, name.trim(), boardId, boards.find((b) => b.id === boardId)?.name, heartbeatCron.trim() || undefined)}
+            onPress={() => onRename(teammate, name.trim(), boardId, boards.find((b) => b.id === boardId)?.name, heartbeatCron.trim() || undefined, emoji?.trim())}
             style={{ padding: 8, borderRadius: 8, backgroundColor: c.accent, opacity: name.trim() ? 1 : 0.4 }}
           >
             <Text style={{ color: c.accentForeground, fontWeight: "600" }}>Save</Text>

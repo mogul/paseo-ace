@@ -49,12 +49,12 @@ export default function contribute(server: PluginServerContext) {
 
   server.handle(teammateBoardsRpc, () => ({ boards: readAceBoards() }));
 
-  server.handle(teammateCreateRpc, ({ name, description, provider, boardId, boardName, heartbeatCron }) => ({
-    teammate: store.create(name, description, provider, boardId, boardName, heartbeatCron),
+  server.handle(teammateCreateRpc, ({ name, description, provider, boardId, boardName, heartbeatCron, persona, emoji }) => ({
+    teammate: store.create(name, description, provider, boardId, boardName, heartbeatCron, persona, emoji),
   }));
 
-  server.handle(teammateRenameRpc, ({ id, name, boardId, boardName, heartbeatCron }) => ({
-    teammate: store.rename(id, name, boardId, boardName, heartbeatCron),
+  server.handle(teammateRenameRpc, ({ id, name, boardId, boardName, heartbeatCron, persona, emoji }) => ({
+    teammate: store.rename(id, name, boardId, boardName, heartbeatCron, persona, emoji),
   }));
 
   server.handle(teammateDeleteRpc, ({ id }) => {

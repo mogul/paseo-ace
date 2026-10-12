@@ -4,11 +4,13 @@ import { z } from "zod";
 export const TeammateSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
+  emoji: z.string().optional(),
   description: z.string().optional(),
   provider: z.string().optional(),
   boardId: z.string().optional(),
   boardName: z.string().optional(),
   heartbeatCron: z.string().optional(),
+  persona: z.string().optional(),
   createdAt: z.string(),
   memoryPath: z.string(),
 });
@@ -33,6 +35,8 @@ export const teammateCreateRpc = defineRpc({
       boardId: z.string().optional(),
       boardName: z.string().optional(),
       heartbeatCron: z.string().optional(),
+      persona: z.string().optional(),
+      emoji: z.string().optional(),
     })
     .strict(),
   output: z.object({ teammate: TeammateSchema }),
@@ -47,6 +51,8 @@ export const teammateRenameRpc = defineRpc({
       boardId: z.string().optional(),
       boardName: z.string().optional(),
       heartbeatCron: z.string().optional(),
+      persona: z.string().optional(),
+      emoji: z.string().optional(),
     })
     .strict(),
   output: z.object({ teammate: TeammateSchema }),
