@@ -490,8 +490,8 @@ function HeartbeatPicker({ theme, value, onChange }: { theme: PluginTheme; value
         <View style={{ gap: 4 }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
             <Text style={{ color: c.foregroundMuted, fontSize: 12 }}>Cron format</Text>
-            <ExternalLink href="https://crontab.cronhub.io/" accessibilityLabel="Cron format documentation">
-              <Text style={{ color: c.accent, fontSize: 12 }}>crontab.cronhub.io</Text>
+            <ExternalLink href="https://crontab.io/" accessibilityLabel="Cron format documentation">
+              <Text style={{ color: c.accent, fontSize: 12 }}>crontab.io</Text>
             </ExternalLink>
           </View>
           <HostTextInput value={value} onChangeText={onChange} style={inputStyle(c)} autoCapitalize="none" autoCorrect={false} placeholder="0 9 * * 1-5" placeholderTextColor={c.foregroundMuted} />
