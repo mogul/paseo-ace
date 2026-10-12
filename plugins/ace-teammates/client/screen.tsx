@@ -1,0 +1,450 @@
+import type { PluginTheme } from "@getpaseo/plugin";
+import type { PluginScreenProps } from "@getpaseo/plugin/client";
+import { usePaseo, useRpc } from "@getpaseo/plugin/client";
+import { copyText, Modal, ScrollView as HostScrollView, TextInput as HostTextInput, useToast } from "@getpaseo/plugin/client/react-native";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMemo, useRef, useState } from "react";
+import { Dimensions, Pressable, Text, View } from "react-native";
+import {
+  teammateBoardsRpc,
+  teammateCreateRpc,
+  teammateDeleteRpc,
+  teammateListRpc,
+  teammateRenameRpc,
+  teammateStartRpc,
+  type BoardSummary,
+  type Teammate,
+} from "../shared/contracts";
+
+type Overlay =
+  | { kind: "new" }
+  | { kind: "start"; teammate: Teammate }
+  | { kind: "rename"; teammate: Teammate }
+  | { kind: "delete"; teammate: Teammate };
+
+interface MenuItem {
+  label: string;
+  danger?: boolean;
+  onPress: () => void;
+}
+interface MenuState {
+  x: number;
+  y: number;
+  items: MenuItem[];
+}
+
+const inputStyle = (c: PluginTheme["colors"]) => ({ color: c.foreground, backgroundColor: c.surface0, borderWidth: 1, borderColor: c.border, borderRadius: 8, padding: 8, fontSize: 13 }) as const;
+const labelStyle = (c: PluginTheme["colors"]) => ({ color: c.foreground, fontWeight: "600", fontSize: 13 }) as const;
+const btn = (c: PluginTheme["colors"]) => ({ padding: 8, borderRadius: 8, backgroundColor: c.border }) as const;
+
+export function TeammatesScreen({ theme, layout, navigation }: PluginScreenProps) {
+  const queryClient = useQueryClient();
+  const toast = useToast();
+
+  const list = useRpc(teammateListRpc);
+  const create = useRpc(teammateCreateRpc);
+  const rename = useRpc(teammateRenameRpc);
+  const remove = useRpc(teammateDeleteRpc);
+  const start = useRpc(teammateStartRpc);
+  const boardsRpc = useRpc(teammateBoardsRpc);
+
+  const [overlay, setOverlay] = useState<Overlay | null>(null);
+  const [menu, setMenu] = useState<MenuState | null>(null);
+  const rootRef = useRef<View>(null);
+
+  const query = useQuery({
+    queryKey: ["ace-teammates", "teammates"],
+    queryFn: () => list({}),
+  });
+
+  const boardsQuery = useQuery({
+    queryKey: ["ace-teammates", "boards"],
+    queryFn: () => boardsRpc({}),
+  });
+  const boards: BoardSummary[] = boardsQuery.data?.boards ?? [];
+
+  const c = theme.colors;
+  const compact = layout.compact;
+
+  const styles = useMemo(
+    () =>
+      ({
+        root: { flex: 1, backgroundColor: c.surface0 },
+        header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 12, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: c.border },
+        headerTitle: { color: c.foreground, fontSize: 16, fontWeight: "600" },
+        newBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, backgroundColor: c.accent },
+        newBtnText: { color: c.accentForeground, fontWeight: "600", fontSize: 13 },
+        list: { padding: 12 },
+        empty: { color: c.foregroundMuted, fontSize: 13, padding: 4 },
+        card: { backgroundColor: c.surface1, borderRadius: 10, borderWidth: 1, borderColor: c.border, padding: 10, gap: 4, marginBottom: 10 },
+        cardHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+        cardName: { color: c.foreground, fontWeight: "600", fontSize: 14, flex: 1 },
+        dots: { color: c.foreground, fontSize: 18, paddingHorizontal: 6, paddingVertical: 2 },
+        muted: { color: c.foregroundMuted, fontSize: 12 },
+        cardActions: { flexDirection: "row", gap: 8, marginTop: 6 },
+        startBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, backgroundColor: c.border },
+        startBtnText: { color: c.foreground, fontSize: 13 },
+      }) as const,
+    [c, compact],
+  );
+
+  const teammates = query.data?.teammates ?? [];
+
+  function invalidate() {
+    queryClient.invalidateQueries({ queryKey: ["ace-teammates", "teammates"] });
+  }
+
+  async function handleCreate(input: { name: string; description?: string; provider?: string; boardId?: string; boardName?: string; heartbeatCron?: string }) {
+    try {
+      await create(input);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : String(err));
+      return;
+    }
+    invalidate();
+    setOverlay(null);
+  }
+
+  async function handleRename(teammate: Teammate, name: string, boardId?: string, boardName?: string, heartbeatCron?: string) {
+    try {
+      await rename({ id: teammate.id, name, boardId, boardName, heartbeatCron });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : String(err));
+      return;
+    }
+    invalidate();
+    setOverlay(null);
+  }
+
+  async function handleDelete(teammate: Teammate) {
+    try {
+      await remove({ id: teammate.id });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : String(err));
+      return;
+    }
+    invalidate();
+    setOverlay(null);
+  }
+
+  async function handleStart(teammate: Teammate, workspaceId?: string) {
+    try {
+      const { agentId } = await start({ id: teammate.id, workspaceId });
+      navigation?.openAgent({ agentId });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : String(err));
+      return;
+    }
+    setOverlay(null);
+  }
+
+  async function copyPath(teammate: Teammate) {
+    try {
+      await copyText(teammate.memoryPath);
+      toast.show("Copied memory path", { variant: "success" });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  function placeMenu(items: MenuItem[], pageX: number, pageY: number) {
+    const root = rootRef.current;
+    if (root && typeof root.measureInWindow === "function") {
+      try {
+        root.measureInWindow((rx, ry) => setMenu({ x: pageX - rx, y: pageY - ry, items }));
+        return;
+      } catch {
+        // fall through to raw coordinates
+      }
+    }
+    setMenu({ x: pageX, y: pageY, items });
+  }
+
+  function openMenu(event: { nativeEvent: { pageX: number; pageY: number } }, teammate: Teammate) {
+    placeMenu(
+      [
+        { label: "Rename", onPress: () => { setMenu(null); setOverlay({ kind: "rename", teammate }); } },
+        { label: "Copy memory path", onPress: () => { setMenu(null); void copyPath(teammate); } },
+        { label: "Delete", danger: true, onPress: () => { setMenu(null); setOverlay({ kind: "delete", teammate }); } },
+      ],
+      event.nativeEvent.pageX,
+      event.nativeEvent.pageY,
+    );
+  }
+
+  return (
+    <View ref={rootRef} style={styles.root}>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Teammates</Text>
+        <Pressable accessibilityRole="button" accessibilityLabel="New teammate" onPress={() => setOverlay({ kind: "new" })} style={styles.newBtn}>
+          <Text style={styles.newBtnText}>New teammate</Text>
+        </Pressable>
+      </View>
+
+      <HostScrollView contentContainerStyle={styles.list}>
+        {teammates.length === 0 ? (
+          <Text style={styles.empty}>No teammates yet.</Text>
+        ) : (
+          teammates.map((t) => (
+            <View key={t.id} style={styles.card}>
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardName}>{t.name}</Text>
+                <Pressable accessibilityRole="button" accessibilityLabel={`${t.name} menu`} onPress={(e) => openMenu(e, t)}>
+                  <Text style={styles.dots}>⋯</Text>
+                </Pressable>
+              </View>
+              {t.description ? <Text style={styles.muted}>{t.description}</Text> : null}
+              {t.boardName ? <Text style={styles.muted}>Board: {t.boardName}</Text> : null}
+              {t.boardId && t.heartbeatCron ? <Text style={styles.muted}>Board agent (heartbeat: {t.heartbeatCron})</Text> : null}
+              {t.provider ? <Text style={styles.muted}>{t.provider}</Text> : null}
+              <View style={styles.cardActions}>
+                <Pressable accessibilityRole="button" accessibilityLabel={`Start ${t.name}`} onPress={() => setOverlay({ kind: "start", teammate: t })} style={styles.startBtn}>
+                  <Text style={styles.startBtnText}>Start</Text>
+                </Pressable>
+              </View>
+            </View>
+          ))
+        )}
+      </HostScrollView>
+
+      {menu ? <ContextMenu menu={menu} theme={theme} onClose={() => setMenu(null)} /> : null}
+
+      {overlay ? (
+        <OverlayView
+          overlay={overlay}
+          theme={theme}
+          boards={boards}
+          onClose={() => setOverlay(null)}
+          onCreate={handleCreate}
+          onRename={handleRename}
+          onDelete={handleDelete}
+          onStart={handleStart}
+        />
+      ) : null}
+    </View>
+  );
+}
+
+function ContextMenu({ menu, theme, onClose }: { menu: MenuState; theme: PluginTheme; onClose: () => void }) {
+  const c = theme.colors;
+  const width = Dimensions.get("window").width;
+  const menuWidth = 180;
+  const left = Math.max(8, Math.min(menu.x - menuWidth + 8, width - menuWidth - 8));
+  return (
+    <>
+      <Pressable accessibilityRole="button" onPress={onClose} style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }} />
+      <View style={{ position: "absolute", top: menu.y + 4, left, width: menuWidth, backgroundColor: c.surface1, borderRadius: 8, borderWidth: 1, borderColor: c.border }}>
+        {menu.items.map((item) => (
+          <Pressable key={item.label} accessibilityRole="button" onPress={item.onPress} style={{ paddingHorizontal: 12, paddingVertical: 10 }}>
+            <Text style={{ color: item.danger ? c.statusDanger : c.foreground, fontSize: 14 }}>{item.label}</Text>
+          </Pressable>
+        ))}
+      </View>
+    </>
+  );
+}
+
+function OverlayView({
+  overlay,
+  theme,
+  boards,
+  onClose,
+  onCreate,
+  onRename,
+  onDelete,
+  onStart,
+}: {
+  overlay: Overlay;
+  theme: PluginTheme;
+  boards: BoardSummary[];
+  onClose: () => void;
+  onCreate: (input: { name: string; description?: string; provider?: string; boardId?: string; boardName?: string; heartbeatCron?: string }) => void;
+  onRename: (teammate: Teammate, name: string, boardId?: string, boardName?: string, heartbeatCron?: string) => void;
+  onDelete: (teammate: Teammate) => void;
+  onStart: (teammate: Teammate, workspaceId?: string) => void;
+}) {
+  switch (overlay.kind) {
+    case "new":
+      return <NewTeammateModal theme={theme} boards={boards} onClose={onClose} onCreate={onCreate} />;
+    case "start":
+      return <StartModal theme={theme} teammate={overlay.teammate} onClose={onClose} onStart={(workspaceId) => onStart(overlay.teammate, workspaceId)} />;
+    case "rename":
+      return <RenameModal theme={theme} teammate={overlay.teammate} boards={boards} onClose={onClose} onRename={onRename} />;
+    case "delete":
+      return <DeleteModal theme={theme} teammate={overlay.teammate} onClose={onClose} onDelete={onDelete} />;
+  }
+}
+
+function BoardPicker({
+  theme,
+  boards,
+  value,
+  onChange,
+}: {
+  theme: PluginTheme;
+  boards: BoardSummary[];
+  value?: string;
+  onChange: (boardId?: string) => void;
+}) {
+  const c = theme.colors;
+  const [open, setOpen] = useState(false);
+  const selected = boards.find((b) => b.id === value);
+  const optionStyle = { paddingHorizontal: 10, paddingVertical: 8 } as const;
+  return (
+    <View style={{ gap: 6 }}>
+      <Text style={labelStyle(c)}>Resident board</Text>
+      <Pressable accessibilityRole="button" accessibilityLabel="Resident board" onPress={() => setOpen((o) => !o)} style={inputStyle(c)}>
+        <Text style={{ color: selected ? c.foreground : c.foregroundMuted }}>{selected ? selected.name : "(none)"}</Text>
+      </Pressable>
+      {open ? (
+        <View style={{ borderWidth: 1, borderColor: c.border, borderRadius: 8, backgroundColor: c.surface0 }}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => {
+              onChange(undefined);
+              setOpen(false);
+            }}
+            style={optionStyle}
+          >
+            <Text style={{ color: value ? c.foregroundMuted : c.foreground }}>(none)</Text>
+          </Pressable>
+          {boards.length === 0 ? <Text style={{ ...optionStyle, color: c.foregroundMuted }}>No boards found.</Text> : null}
+          {boards.map((b) => (
+            <Pressable
+              key={b.id}
+              accessibilityRole="button"
+              onPress={() => {
+                onChange(b.id);
+                setOpen(false);
+              }}
+              style={optionStyle}
+            >
+              <Text style={{ color: b.id === value ? c.accent : c.foreground }}>{b.name}</Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+function NewTeammateModal({ theme, boards, onClose, onCreate }: { theme: PluginTheme; boards: BoardSummary[]; onClose: () => void; onCreate: (input: { name: string; description?: string; provider?: string; boardId?: string; boardName?: string; heartbeatCron?: string }) => void }) {
+  const c = theme.colors;
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [provider, setProvider] = useState("");
+  const [boardId, setBoardId] = useState<string | undefined>(undefined);
+  const [heartbeatCron, setHeartbeatCron] = useState("");
+
+  return (
+    <Modal title="New teammate" open onOpenChange={(o) => { if (!o) onClose(); }}>
+      <Modal.Content contentContainerStyle={{ gap: 12 }}>
+        <Text style={labelStyle(c)}>Name</Text>
+        <HostTextInput value={name} onChangeText={setName} style={inputStyle(c)} autoFocus />
+        <Text style={labelStyle(c)}>Description</Text>
+        <HostTextInput value={description} onChangeText={setDescription} style={inputStyle(c)} />
+        <Text style={labelStyle(c)}>Provider</Text>
+        <HostTextInput value={provider} onChangeText={setProvider} style={inputStyle(c)} autoCapitalize="none" autoCorrect={false} placeholder="opencode/opencode-go/deepseek-v4-flash" placeholderTextColor={c.foregroundMuted} />
+        <BoardPicker theme={theme} boards={boards} value={boardId} onChange={setBoardId} />
+        <Text style={labelStyle(c)}>Heartbeat (cron)</Text>
+        <HostTextInput value={heartbeatCron} onChangeText={setHeartbeatCron} style={inputStyle(c)} autoCapitalize="none" autoCorrect={false} placeholder="0 9 * * 1-5" placeholderTextColor={c.foregroundMuted} />
+        <View style={{ flexDirection: "row", gap: 8, justifyContent: "flex-end" }}>
+          <Pressable accessibilityRole="button" onPress={onClose} style={btn(c)}>
+            <Text style={{ color: c.foreground }}>Cancel</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            disabled={!name.trim()}
+            onPress={() => onCreate({ name: name.trim(), description: description.trim() || undefined, provider: provider.trim() || undefined, boardId, boardName: boards.find((b) => b.id === boardId)?.name, heartbeatCron: heartbeatCron.trim() || undefined })}
+            style={{ padding: 8, borderRadius: 8, backgroundColor: c.accent, opacity: name.trim() ? 1 : 0.4 }}
+          >
+            <Text style={{ color: c.accentForeground, fontWeight: "600" }}>Create</Text>
+          </Pressable>
+        </View>
+      </Modal.Content>
+    </Modal>
+  );
+}
+
+function StartModal({ theme, teammate, onClose, onStart }: { theme: PluginTheme; teammate: Teammate; onClose: () => void; onStart: (workspaceId?: string) => void }) {
+  const c = theme.colors;
+  const paseo = usePaseo();
+  const workspacesQuery = useQuery({
+    queryKey: ["ace-teammates", "workspaces"],
+    queryFn: async () => (await paseo.workspaces.list()).entries,
+  });
+  const workspaces = (workspacesQuery.data ?? []).filter((w) => !w.archivingAt);
+
+  return (
+    <Modal title={`Start ${teammate.name}`} open onOpenChange={(o) => { if (!o) onClose(); }}>
+      <Modal.Content scrollable={false} contentContainerStyle={{ gap: 12 }}>
+        <HostScrollView style={{ maxHeight: 320 }}>
+          <Pressable accessibilityRole="button" onPress={() => onStart(undefined)} style={{ padding: 10, borderRadius: 8, backgroundColor: c.border, marginBottom: 6 }}>
+            <Text style={{ color: c.foreground }}>No workspace (run in teammate home)</Text>
+          </Pressable>
+          {workspaces.map((w) => (
+            <Pressable key={w.id} accessibilityRole="button" onPress={() => onStart(w.id)} style={{ padding: 10, borderRadius: 8, backgroundColor: c.border, marginBottom: 6 }}>
+              <Text style={{ color: c.foreground }}>{w.name}</Text>
+            </Pressable>
+          ))}
+        </HostScrollView>
+        <Pressable accessibilityRole="button" onPress={onClose} style={btn(c)}>
+          <Text style={{ color: c.foreground }}>Cancel</Text>
+        </Pressable>
+      </Modal.Content>
+    </Modal>
+  );
+}
+
+function RenameModal({ theme, teammate, boards, onClose, onRename }: { theme: PluginTheme; teammate: Teammate; boards: BoardSummary[]; onClose: () => void; onRename: (teammate: Teammate, name: string, boardId?: string, boardName?: string, heartbeatCron?: string) => void }) {
+  const c = theme.colors;
+  const [name, setName] = useState(teammate.name);
+  const [boardId, setBoardId] = useState<string | undefined>(teammate.boardId);
+  const [heartbeatCron, setHeartbeatCron] = useState(teammate.heartbeatCron ?? "");
+
+  return (
+    <Modal title="Rename teammate" open onOpenChange={(o) => { if (!o) onClose(); }}>
+      <Modal.Content contentContainerStyle={{ gap: 12 }}>
+        <Text style={labelStyle(c)}>Name</Text>
+        <HostTextInput value={name} onChangeText={setName} style={inputStyle(c)} autoFocus />
+        <BoardPicker theme={theme} boards={boards} value={boardId} onChange={setBoardId} />
+        <Text style={labelStyle(c)}>Heartbeat (cron)</Text>
+        <HostTextInput value={heartbeatCron} onChangeText={setHeartbeatCron} style={inputStyle(c)} autoCapitalize="none" autoCorrect={false} placeholder="0 9 * * 1-5" placeholderTextColor={c.foregroundMuted} />
+        <View style={{ flexDirection: "row", gap: 8, justifyContent: "flex-end" }}>
+          <Pressable accessibilityRole="button" onPress={onClose} style={btn(c)}>
+            <Text style={{ color: c.foreground }}>Cancel</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            disabled={!name.trim()}
+            onPress={() => onRename(teammate, name.trim(), boardId, boards.find((b) => b.id === boardId)?.name, heartbeatCron.trim() || undefined)}
+            style={{ padding: 8, borderRadius: 8, backgroundColor: c.accent, opacity: name.trim() ? 1 : 0.4 }}
+          >
+            <Text style={{ color: c.accentForeground, fontWeight: "600" }}>Save</Text>
+          </Pressable>
+        </View>
+      </Modal.Content>
+    </Modal>
+  );
+}
+
+function DeleteModal({ theme, teammate, onClose, onDelete }: { theme: PluginTheme; teammate: Teammate; onClose: () => void; onDelete: (teammate: Teammate) => void }) {
+  const c = theme.colors;
+  return (
+    <Modal title="Delete teammate" open onOpenChange={(o) => { if (!o) onClose(); }}>
+      <Modal.Content contentContainerStyle={{ gap: 12 }}>
+        <Text style={{ color: c.foreground, fontSize: 13 }}>
+          Delete "{teammate.name}" and its memory? This cannot be undone.
+        </Text>
+        <View style={{ flexDirection: "row", gap: 8, justifyContent: "flex-end" }}>
+          <Pressable accessibilityRole="button" onPress={onClose} style={btn(c)}>
+            <Text style={{ color: c.foreground }}>Cancel</Text>
+          </Pressable>
+          <Pressable accessibilityRole="button" onPress={() => onDelete(teammate)} style={{ padding: 8, borderRadius: 8, backgroundColor: c.statusDanger }}>
+            <Text style={{ color: c.foreground, fontWeight: "600" }}>Delete</Text>
+          </Pressable>
+        </View>
+      </Modal.Content>
+    </Modal>
+  );
+}

@@ -1,0 +1,9 @@
+{
+  "id": "ace",
+  "name": "ACE",
+  "description": "A board of zones for your workspaces: move a workspace into a zone to run that zone's prompt, or use zones as status flags.",
+  "media": [],
+  "requirements": {
+    "paseo": ">=0.11.2"
+  }
+}

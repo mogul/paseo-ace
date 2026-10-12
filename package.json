@@ -1,0 +1,11 @@
+{
+  "name": "paseo-ace",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ACE (Agentic Coding Enabler): a suite of self-contained Paseo plugins.",
+  "scripts": {
+    "typecheck": "node scripts/typecheck.mjs",
+    "typecheck:all": "node scripts/typecheck.mjs"
+  },
+  "license": "MIT"
+}
