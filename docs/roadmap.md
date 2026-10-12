@@ -17,6 +17,13 @@
 - **Supervisor (board-resident agent)** — a teammate with a `boardId` +
   `heartbeatCron`; `ace-teammates` wakes it on cron, in its home dir, with its
   identity + `HEARTBEAT.md`/`BOARD.md` + board MCP + memory MCP.
+- **Persona gallery + emoji** — 9 personas seed identity files; emoji picker.
+- **Template versioning** — `frameworkVersion` per teammate; migration updates
+  framework files (`BOARD.md`/`HEARTBEAT.md`) and preserves learned files.
+- **Presence** — the board banner shows associated teammates (emoji row),
+  lit when actively running.
+- **State-as-git** — state consolidated to `~/.paseo/ace/`; `scripts/ace-state-init.ps1`
+  sets up git for backup/rollback/sharing.
 
 ## Next
 
