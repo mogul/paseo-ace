@@ -11,6 +11,7 @@ export const TeammateSchema = z.object({
   boardName: z.string().optional(),
   heartbeatCron: z.string().optional(),
   persona: z.string().optional(),
+  frameworkVersion: z.string().optional(),
   createdAt: z.string(),
   memoryPath: z.string(),
 });

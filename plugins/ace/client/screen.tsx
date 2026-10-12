@@ -21,10 +21,12 @@ import {
   boardSetDefaultsRpc,
   boardSetLastVisitedRpc,
   boardStateRpc,
+  boardTeammatesRpc,
   boardUpdateZoneRpc,
   boardWorkspacesRpc,
   type Board,
   type BoardSummary,
+  type BoardTeammate,
   type CardDefaults,
   type Project,
   type Session,
@@ -92,6 +94,7 @@ export function BoardScreen({ theme, layout, navigation }: PluginScreenProps) {
   const toast = useToast();
 
   const getState = useRpc(boardStateRpc);
+  const getTeammates = useRpc(boardTeammatesRpc);
   const move = useRpc(boardMoveRpc);
   const addZone = useRpc(boardAddZoneRpc);
   const updateZone = useRpc(boardUpdateZoneRpc);
@@ -118,6 +121,12 @@ export function BoardScreen({ theme, layout, navigation }: PluginScreenProps) {
     refetchInterval: 3000,
   });
 
+  const teammatesQuery = useQuery({
+    queryKey: ["ace", "board-teammates"],
+    queryFn: () => getTeammates({}),
+    refetchInterval: 3000,
+  });
+
   const c = theme.colors;
   const compact = layout.compact;
   const styles = useMemo(
@@ -128,6 +137,11 @@ export function BoardScreen({ theme, layout, navigation }: PluginScreenProps) {
         bannerSide: { flex: 1, flexDirection: "row", alignItems: "center" },
         selector: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: c.border, backgroundColor: c.surface1 },
         selectorText: { color: c.foreground, fontSize: 13, fontWeight: "600" },
+        teammatesRow: { flexDirection: "row", alignItems: "center", gap: 2 },
+        teammateItem: { position: "relative" as const, paddingRight: 4 },
+        teammateEmoji: { color: c.foreground, fontSize: 16 },
+        teammateEmojiInactive: { opacity: 0.35 },
+        teammateActiveDot: { position: "absolute" as const, top: 0, right: 2, width: 6, height: 6, borderRadius: 3, backgroundColor: c.accent },
         search: { flex: 1, color: c.foreground, backgroundColor: c.surface0, borderWidth: 1, borderColor: c.border, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 6, fontSize: 13 },
         dots: { color: c.foreground, fontSize: 18, paddingHorizontal: 6, paddingVertical: 2 },
         col: { width: 260, marginRight: 12, backgroundColor: c.surface1, borderRadius: 10, borderWidth: 1, borderColor: c.border },
@@ -147,6 +161,11 @@ export function BoardScreen({ theme, layout, navigation }: PluginScreenProps) {
   const board = query.data?.board;
   const workspaces = query.data?.workspaces ?? [];
   const boards = query.data?.boards ?? [];
+
+  const boardTeammates: BoardTeammate[] = boardId
+    ? (teammatesQuery.data?.teammates ?? []).filter((t) => t.boardId === boardId)
+    : [];
+  const activeTeammateIds = new Set(teammatesQuery.data?.active ?? []);
 
   function invalidate() {
     queryClient.invalidateQueries({ queryKey: ["ace", "board"] });
@@ -379,6 +398,19 @@ export function BoardScreen({ theme, layout, navigation }: PluginScreenProps) {
           <Text style={styles.selectorText}>Board: {board?.name ?? "…"}</Text>
           <Text style={{ color: c.foregroundMuted, fontSize: 12 }}>▾</Text>
         </Pressable>
+        {boardTeammates.length > 0 ? (
+          <View style={styles.teammatesRow}>
+            {boardTeammates.map((t) => {
+              const active = activeTeammateIds.has(t.id);
+              return (
+                <View key={t.id} accessible accessibilityLabel={t.name} style={styles.teammateItem}>
+                  <Text style={[styles.teammateEmoji, !active && styles.teammateEmojiInactive]}>{t.emoji ?? "🤖"}</Text>
+                  {active ? <View style={styles.teammateActiveDot} /> : null}
+                </View>
+              );
+            })}
+          </View>
+        ) : null}
         <View style={styles.bannerSide}>
           <HostTextInput
             value={search}

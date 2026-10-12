@@ -1,5 +1,6 @@
 import type { PaseoApi } from "@getpaseo/client";
 import type { Teammate } from "../shared/contracts";
+import { PresenceTracker } from "./presence";
 import { buildSystemPrompt, type TeammateStore } from "./teammates";
 
 const TICK_MS = 20_000;
@@ -97,6 +98,7 @@ export class HeartbeatScheduler {
   constructor(
     private readonly store: TeammateStore,
     private readonly getPaseo: () => PaseoApi | null,
+    private readonly presence: PresenceTracker,
   ) {}
 
   start(): void {
@@ -114,6 +116,8 @@ export class HeartbeatScheduler {
   }
 
   onTurnEnded(agentId: string): void {
+    // Clear presence for any agent (heartbeat- or start-spawned) that finished.
+    this.presence.onTurnEnded(agentId);
     for (const [teammateId, liveId] of this.live) {
       if (liveId === agentId) {
         this.live.delete(teammateId);
@@ -151,6 +155,7 @@ export class HeartbeatScheduler {
         prompt: buildHeartbeatPrompt(teammate),
       });
       this.live.set(teammate.id, agent.id);
+      this.presence.markActive(teammate.id, agent.id);
     } catch (error) {
       console.error(`[ace-teammates] heartbeat failed for ${teammate.id}:`, error);
     }

@@ -62,7 +62,12 @@ under the daemon's Paseo home (`$PASEO_HOME`, defaulting to `~/.paseo`):
   boards.json                # ace: board layout, placement, card defaults
   teammates.json             # ace-teammates: teammate index
   teammates/<slug>/          # ace-teammates: SOUL.md, USER.md, memory/, …
+  active.json                # ace-teammates: ephemeral "running now" set (gitignored)
 ```
+
+`active.json` records which teammates currently have a running session so the
+board can light them up; it is transient and excluded from version control
+(the setup script writes a `.gitignore` entry for it).
 
 On first load each plugin migrates any state found under the legacy
 `~/.paseo/plugins/ace` / `~/.paseo/plugins/ace-teammates` locations into

@@ -62,6 +62,20 @@ try {
   }
   git config --local commit.gpgsign false
 
+  # Ephemeral presence state (which teammates are running) must never be
+  # committed to the state repo.
+  $gitignorePath = Join-Path $stateDir ".gitignore"
+  $ignoreLine = "active.json"
+  if (Test-Path -LiteralPath $gitignorePath) {
+    $existing = Get-Content -LiteralPath $gitignorePath -Raw
+    if ($existing -notmatch [regex]::Escape($ignoreLine)) {
+      Add-Content -LiteralPath $gitignorePath -Value "`n$ignoreLine"
+    }
+  }
+  else {
+    Set-Content -LiteralPath $gitignorePath -Value "$ignoreLine`n"
+  }
+
   git add -A
   git commit -m "ace state snapshot" --no-gpg-sign
   if ($LASTEXITCODE -ne 0) {

@@ -14,12 +14,14 @@ import {
   boardSetDefaultsRpc,
   boardSetLastVisitedRpc,
   boardStateRpc,
+  boardTeammatesRpc,
   boardUpdateZoneRpc,
   boardWorkspacesRpc,
 } from "./shared/contracts";
 import { BoardStore } from "./server/board";
 import { BoardEngine } from "./server/engine";
 import { buildAllWorkspaceCards, buildWorkspaceCards } from "./server/state";
+import { readBoardTeammates } from "./server/teammates";
 import { McpServer } from "./server/mcp";
 
 export default function contribute(server: PluginServerContext) {
@@ -76,6 +78,11 @@ export default function contribute(server: PluginServerContext) {
       boards: store.list().map((b) => ({ id: b.id, name: b.name })),
       lastVisitedBoardId: store.lastVisited(),
     };
+  });
+
+  server.handle(boardTeammatesRpc, () => {
+    const { teammates, active } = readBoardTeammates();
+    return { teammates, active };
   });
 
   server.handle(boardCreateRpc, ({ name }) => {

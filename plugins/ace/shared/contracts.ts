@@ -92,6 +92,26 @@ export type Project = z.infer<typeof ProjectSchema>;
 export const BoardSummarySchema = z.object({ id: z.string(), name: z.string() });
 export type BoardSummary = z.infer<typeof BoardSummarySchema>;
 
+// Read-only coupling to the `ace-teammates` plugin via the filesystem contract
+// (~/.paseo/ace/teammates.json + active.json). Only the fields ace needs to
+// render presence on the board.
+export const BoardTeammateSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  emoji: z.string().optional(),
+  boardId: z.string().optional(),
+});
+export type BoardTeammate = z.infer<typeof BoardTeammateSchema>;
+
+export const boardTeammatesRpc = defineRpc({
+  name: "board.teammates",
+  input: z.object({}).strict(),
+  output: z.object({
+    teammates: z.array(BoardTeammateSchema),
+    active: z.array(z.string()),
+  }),
+});
+
 export const boardStateRpc = defineRpc({
   name: "board.state",
   input: z.object({ boardId: z.string().optional() }).strict(),

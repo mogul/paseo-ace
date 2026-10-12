@@ -9,11 +9,13 @@ import {
   teammateStartRpc,
 } from "./shared/contracts";
 import { McpServer } from "./server/mcp";
+import { PresenceTracker } from "./server/presence";
 import { HeartbeatScheduler } from "./server/scheduler";
 import { buildSystemPrompt, readAceBoards, TeammateStore } from "./server/teammates";
 
 export default function contribute(server: PluginServerContext) {
   const store = new TeammateStore();
+  const presence = new PresenceTracker();
   let paseoApi: PaseoApi | null = null;
 
   const mcpServer = new McpServer();
@@ -28,7 +30,7 @@ export default function contribute(server: PluginServerContext) {
     paseoApi = paseo;
   };
 
-  const scheduler = new HeartbeatScheduler(store, () => paseoApi);
+  const scheduler = new HeartbeatScheduler(store, () => paseoApi, presence);
   scheduler.start();
 
   server.before("agent.create", ({ request }, { paseo }) => {
@@ -66,18 +68,22 @@ export default function contribute(server: PluginServerContext) {
     capturePaseo(paseo);
     if (!paseoApi) throw new Error("Paseo API is not available yet.");
     const { name, systemPrompt, provider } = buildSystemPrompt(store, id);
+    let agentId: string;
     if (workspaceId) {
       const agent = await paseo.workspaces.ref(workspaceId).agents.create({
         config: { provider, systemPrompt },
         title: name,
       });
-      return { agentId: agent.id };
+      agentId = agent.id;
+    } else {
+      const agent = await paseo.agents.create({
+        config: { provider, systemPrompt },
+        cwd: store.memoryPath(id),
+      });
+      agentId = agent.id;
     }
-    const agent = await paseo.agents.create({
-      config: { provider, systemPrompt },
-      cwd: store.memoryPath(id),
-    });
-    return { agentId: agent.id };
+    presence.markActive(id, agentId);
+    return { agentId };
   });
 
   server.on("agent.created", (_event, { paseo }) => capturePaseo(paseo));

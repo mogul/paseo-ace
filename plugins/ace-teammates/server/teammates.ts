@@ -14,10 +14,16 @@ interface TeammateRecord {
   heartbeatCron?: string;
   persona?: string;
   emoji?: string;
+  frameworkVersion?: string;
   createdAt: string;
 }
 
 export const DEFAULT_PROVIDER = "opencode/opencode-go/deepseek-v4-flash";
+
+// The current framework/template version. Stamped on every teammate at creation;
+// bumped when the plugin's seeded template files change meaning. See
+// migrateFramework() for how upgrades are applied.
+export const FRAMEWORK_VERSION = "1";
 
 interface TeammatesData {
   teammates: TeammateRecord[];
@@ -28,6 +34,44 @@ const USER_SEED = "# About the user\n\n(preferences, patterns — the teammate f
 const BOARD_SEED = "# Board\n\nDescribe what each zone on this board means and how work moves between zones.";
 const HEARTBEAT_SEED =
   "# Heartbeat\n\nOptional periodic tasks: review board state, triage new work, summarize to memory.";
+
+// ---------------------------------------------------------------------------
+// Template versioning — FRAMEWORK vs LEARNED files
+//
+// A teammate's home dir holds two classes of files:
+//   - FRAMEWORK files are "owned by the template": they carry plugin semantics
+//     (resident-board zone meaning, heartbeat tasks) rather than personal data,
+//     so they are safe to overwrite when FRAMEWORK_VERSION bumps.
+//   - LEARNED files are owned by the teammate/user and must NEVER be overwritten:
+//     SOUL.md, USER.md, IDENTITY.md, and the memory/ directory hold the
+//     teammate's accumulated identity and memory.
+//
+// FRAMEWORK_FILES maps the template-owned filenames to their current seed. The
+// LEARNED set is documented here for clarity only; migrateFramework never
+// touches it.
+// ---------------------------------------------------------------------------
+const FRAMEWORK_FILES: Record<string, string> = {
+  "BOARD.md": BOARD_SEED,
+  "HEARTBEAT.md": HEARTBEAT_SEED,
+};
+
+// Compares dotted numeric versions ("1", "1.2", "10"). Returns <0, 0, or >0.
+function compareFrameworkVersions(a: string, b: string): number {
+  const as = a.split(".").map((n) => Number(n) || 0);
+  const bs = b.split(".").map((n) => Number(n) || 0);
+  const len = Math.max(as.length, bs.length);
+  for (let i = 0; i < len; i++) {
+    const av = as[i] ?? 0;
+    const bv = bs[i] ?? 0;
+    if (av !== bv) return av - bv;
+  }
+  return 0;
+}
+
+function isFrameworkOutdated(version: string | undefined): boolean {
+  if (!version) return true;
+  return compareFrameworkVersions(version, FRAMEWORK_VERSION) < 0;
+}
 
 function identitySeed(name: string): string {
   return `# Identity\n\nName: ${name}\n\n(purpose)`;
@@ -141,6 +185,28 @@ export class TeammateStore {
     this.indexPath = join(this.dir, "teammates.json");
     mkdirSync(this.teammatesDir, { recursive: true });
     this.data = this.load();
+    this.migrateFramework();
+  }
+
+  // Runs once at plugin load. For each teammate whose frameworkVersion is
+  // missing or older than FRAMEWORK_VERSION, overwrite the FRAMEWORK files from
+  // the current templates and bump frameworkVersion. LEARNED files (SOUL.md,
+  // USER.md, IDENTITY.md, memory/) are never touched. At v1 every teammate is
+  // created with FRAMEWORK_VERSION, so this is a no-op; the classification and
+  // mechanism are in place for future bumps.
+  private migrateFramework(): void {
+    let changed = false;
+    for (const record of this.data.teammates) {
+      if (!isFrameworkOutdated(record.frameworkVersion)) continue;
+      const dir = this.memoryPath(record.id);
+      mkdirSync(dir, { recursive: true });
+      for (const [filename, seed] of Object.entries(FRAMEWORK_FILES)) {
+        writeFileSync(join(dir, filename), seed, "utf8");
+      }
+      record.frameworkVersion = FRAMEWORK_VERSION;
+      changed = true;
+    }
+    if (changed) this.persist();
   }
 
   private load(): TeammatesData {
@@ -185,6 +251,7 @@ export class TeammateStore {
       heartbeatCron: heartbeatCron?.trim() || undefined,
       persona: persona?.trim() || undefined,
       emoji: emoji?.trim() || undefined,
+      frameworkVersion: FRAMEWORK_VERSION,
       createdAt: new Date().toISOString(),
     };
 
