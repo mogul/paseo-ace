@@ -8,7 +8,7 @@ The board is a single screen in the Paseo sidebar, on desktop, web, and mobile. 
 
 ## Setup
 
-Requires Paseo 0.11.2 or later. The daemon machine needs the providers referenced by zone prompts available. Board data lives under `~/.paseo/plugins/ace/` (or `$PASEO_HOME/plugins/ace/`).
+Requires Paseo 0.11.2 or later. The daemon machine needs the providers referenced by zone prompts available. Board data lives under `~/.paseo/ace/` (or `$PASEO_HOME/ace/`).
 
 ## Zones
 

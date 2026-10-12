@@ -52,4 +52,4 @@ npm install
 npm run typecheck
 ```
 
-Board data lives in `~/.paseo/plugins/ace/board.json`.
+Board data lives in `~/.paseo/ace/boards.json`.

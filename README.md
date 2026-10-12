@@ -52,6 +52,39 @@ npm run typecheck
 See `docs/architecture.md` for the design, and the plugin's `OVERVIEW.md` /
 `README.md` for details.
 
+## State (version control)
+
+Both plugins store their runtime state in one shared, git-versioned directory
+under the daemon's Paseo home (`$PASEO_HOME`, defaulting to `~/.paseo`):
+
+```
+~/.paseo/ace/
+  boards.json                # ace: board layout, placement, card defaults
+  teammates.json             # ace-teammates: teammate index
+  teammates/<slug>/          # ace-teammates: SOUL.md, USER.md, memory/, …
+```
+
+On first load each plugin migrates any state found under the legacy
+`~/.paseo/plugins/ace` / `~/.paseo/plugins/ace-teammates` locations into
+`~/.paseo/ace` (copy only; legacy files are left in place).
+
+To version-control this directory, run the one-shot setup script with your
+remote as the argument:
+
+```
+.\scripts\ace-state-init.ps1 https://github.com/user/paseo-ace-state.git
+```
+
+After that, from inside `~/.paseo/ace`:
+
+```
+git add -A; git commit -m "ace state snapshot"   # commit current state
+git push                                         # push to origin
+git pull --rebase                                # pull remote changes
+git log --oneline                                # inspect history
+git checkout <sha> -- .                          # restore files to a snapshot
+```
+
 ## License
 
 MIT. See [LICENSE](LICENSE).

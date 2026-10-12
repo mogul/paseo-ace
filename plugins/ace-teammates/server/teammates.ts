@@ -1,4 +1,4 @@
-import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { BoardSummary, Teammate } from "../shared/contracts";
@@ -32,7 +32,47 @@ function identitySeed(name: string): string {
 
 function baseDir(): string {
   const base = process.env.PASEO_HOME || join(homedir(), ".paseo");
+  return join(base, "ace");
+}
+
+function legacyBaseDir(): string {
+  const base = process.env.PASEO_HOME || join(homedir(), ".paseo");
   return join(base, "plugins", "ace-teammates");
+}
+
+function copyDirRecursive(src: string, dest: string): void {
+  if (!existsSync(src)) return;
+  mkdirSync(dest, { recursive: true });
+  for (const entry of readdirSync(src)) {
+    const from = join(src, entry);
+    const to = join(dest, entry);
+    if (statSync(from).isDirectory()) {
+      copyDirRecursive(from, to);
+    } else {
+      copyFileSync(from, to);
+    }
+  }
+}
+
+// One-time migration from the pre-consolidation layout (teammate state lived
+// under ~/.paseo/plugins/ace-teammates) to the shared ~/.paseo/ace directory.
+// The legacy files are copied, never deleted.
+function migrate(): void {
+  const dir = baseDir();
+  const indexPath = join(dir, "teammates.json");
+  const legacy = legacyBaseDir();
+  const legacyIndex = join(legacy, "teammates.json");
+  const legacyTeammatesDir = join(legacy, "teammates");
+
+  if (!existsSync(indexPath) && existsSync(legacyIndex)) {
+    mkdirSync(dir, { recursive: true });
+    copyFileSync(legacyIndex, indexPath);
+  }
+
+  const teammatesDir = join(dir, "teammates");
+  if (!existsSync(teammatesDir) && existsSync(legacyTeammatesDir)) {
+    copyDirRecursive(legacyTeammatesDir, teammatesDir);
+  }
 }
 
 // Read-only coupling to the `ace` plugin's board store. This is the only touch
@@ -40,7 +80,7 @@ function baseDir(): string {
 // and never write to it from here.
 export function readAceBoards(): BoardSummary[] {
   const base = process.env.PASEO_HOME || join(homedir(), ".paseo");
-  const path = join(base, "plugins", "ace", "boards.json");
+  const path = join(base, "ace", "boards.json");
   try {
     if (!existsSync(path)) return [];
     const parsed = JSON.parse(readFileSync(path, "utf8")) as { boards?: unknown };
@@ -80,6 +120,7 @@ export class TeammateStore {
   private data: TeammatesData;
 
   constructor() {
+    migrate();
     this.dir = baseDir();
     this.teammatesDir = join(this.dir, "teammates");
     this.indexPath = join(this.dir, "teammates.json");

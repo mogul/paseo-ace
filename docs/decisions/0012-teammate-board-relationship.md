@@ -34,7 +34,7 @@ showed the opposite: a teammate is associated with a board.
 - Keep identity injected into the system prompt at start (more reliable than
   relying on the agent to follow `BOOT.md`); keep memory via MCP.
 - **Board picker via a filesystem contract**: `ace-teammates` reads
-  `ace`'s `~/.paseo/plugins/ace/boards.json` to list boards for the picker. The
+  `ace`'s `~/.paseo/ace/boards.json` to list boards for the picker. The
   two plugins are coupled only through that file's `{ boards: [{ id, name }] }`
   shape; treat `ace`'s boards schema as the shared contract.
 
@@ -42,7 +42,7 @@ showed the opposite: a teammate is associated with a board.
 
 A teammate's **home** (identity + memory) is distinct from the **repos/workspaces
 it works on**. In Agor the home is a branch of the framework repo; in Paseo it is
-`~/.paseo/plugins/ace-teammates/teammates/<slug>/`. Work happens in whatever
+`~/.paseo/ace/teammates/<slug>/`. Work happens in whatever
 workspace the teammate is "Started" in; one teammate spans many work repos while
 its home (memory) persists. A `TOOLS.md`-style repo roster in the home is an
 optional fast-follow.

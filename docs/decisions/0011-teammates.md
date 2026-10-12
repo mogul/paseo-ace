@@ -16,7 +16,7 @@ Paseo, where workspaces/worktrees are ephemeral.
   later composition of `ace` (board MCP) + `ace-teammates` (memory MCP) + a
   heartbeat.
 - A **teammate** lives in a stable home directory that outlives workspaces:
-  `~/.paseo/plugins/ace-teammates/teammates/<slug>/`, containing:
+  `~/.paseo/ace/teammates/<slug>/`, containing:
   - `SOUL.md` (personality/style/principles)
   - `USER.md` (knowledge about the user/preferences)
   - `IDENTITY.md` (name/purpose)

@@ -26,7 +26,7 @@ droppable regions (arranged in columns). Agor's "Cards (beta)" is unrelated.
 
 ## Data model
 
-`~/.paseo/plugins/ace/boards.json`:
+`~/.paseo/ace/boards.json`:
 
 ```json
 {

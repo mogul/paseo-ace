@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { BoardsDataSchema, type Board, type BoardsData, type CardDefaults } from "../shared/contracts";
@@ -42,7 +42,25 @@ const DEFAULT_BOARDS: BoardsData = {
 
 function dataDir(): string {
   const base = process.env.PASEO_HOME || join(homedir(), ".paseo");
+  return join(base, "ace");
+}
+
+function legacyDataDir(): string {
+  const base = process.env.PASEO_HOME || join(homedir(), ".paseo");
   return join(base, "plugins", "ace");
+}
+
+// One-time migration from the pre-consolidation layout (board state lived under
+// ~/.paseo/plugins/ace) to the shared ~/.paseo/ace directory. The legacy files
+// are copied, never deleted.
+function migrate(): void {
+  const dir = dataDir();
+  const path = join(dir, "boards.json");
+  if (existsSync(path)) return;
+  const legacy = join(legacyDataDir(), "boards.json");
+  if (!existsSync(legacy)) return;
+  mkdirSync(dir, { recursive: true });
+  copyFileSync(legacy, path);
 }
 
 export class BoardStore {
@@ -51,6 +69,7 @@ export class BoardStore {
   private data: BoardsData;
 
   constructor() {
+    migrate();
     this.dir = dataDir();
     this.path = join(this.dir, "boards.json");
     mkdirSync(this.dir, { recursive: true });
