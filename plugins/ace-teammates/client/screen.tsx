@@ -349,17 +349,17 @@ function EmojiButton({ theme, value, onChange }: { theme: PluginTheme; value?: s
   const c = theme.colors;
   const [open, setOpen] = useState(false);
   return (
-    <View style={{ zIndex: open ? 1000 : 0 }}>
+    <>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Choose emoji"
-        onPress={() => setOpen((o) => !o)}
-        style={{ width: 40, height: 40, alignItems: "center", justifyContent: "center", borderRadius: 8, borderWidth: 1, borderColor: open ? c.accent : c.border, backgroundColor: c.surface0 }}
+        onPress={() => setOpen(true)}
+        style={{ width: 40, height: 40, alignItems: "center", justifyContent: "center", borderRadius: 8, borderWidth: 1, borderColor: c.border, backgroundColor: c.surface0 }}
       >
         <Text style={{ fontSize: 18 }}>{value || "🙂"}</Text>
       </Pressable>
-      {open ? (
-        <View style={{ position: "absolute", top: 44, left: 0, zIndex: 1000, elevation: 12, width: 232, backgroundColor: c.surface1, borderRadius: 8, borderWidth: 1, borderColor: c.border, padding: 8 }}>
+      <Modal title="Choose emoji" open={open} onOpenChange={(o) => setOpen(o)}>
+        <Modal.Content>
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
             {EMOJI_CHOICES.map((e) => {
               const selected = value === e;
@@ -369,16 +369,16 @@ function EmojiButton({ theme, value, onChange }: { theme: PluginTheme; value?: s
                   accessibilityRole="button"
                   accessibilityLabel={`Emoji ${e}`}
                   onPress={() => { onChange(e); setOpen(false); }}
-                  style={{ width: 36, height: 36, alignItems: "center", justifyContent: "center", borderRadius: 8, borderWidth: 1, borderColor: selected ? c.accent : c.border, backgroundColor: selected ? c.accent : c.surface0 }}
+                  style={{ width: 40, height: 40, alignItems: "center", justifyContent: "center", borderRadius: 8, borderWidth: 1, borderColor: selected ? c.accent : c.border, backgroundColor: selected ? c.accent : c.surface0 }}
                 >
                   <Text style={{ fontSize: 18 }}>{e}</Text>
                 </Pressable>
               );
             })}
           </View>
-        </View>
-      ) : null}
-    </View>
+        </Modal.Content>
+      </Modal>
+    </>
   );
 }
 
@@ -430,7 +430,7 @@ function ProviderCombobox({ theme, value, onChange }: { theme: PluginTheme; valu
           style={{ flex: 1, color: c.foreground, padding: 8, fontSize: 13 }}
           autoCapitalize="none"
           autoCorrect={false}
-          placeholder="opencode/opencode-go/deepseek-v4-flash"
+          placeholder="Search providers and models…"
           placeholderTextColor={c.foregroundMuted}
           onFocus={() => { if (blurTimer.current) clearTimeout(blurTimer.current); setEditing(true); setFilter(""); setOpen(true); }}
           onBlur={closeSoon}
@@ -490,8 +490,8 @@ function HeartbeatPicker({ theme, value, onChange }: { theme: PluginTheme; value
         <View style={{ gap: 4 }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
             <Text style={{ color: c.foregroundMuted, fontSize: 12 }}>Cron format</Text>
-            <ExternalLink href="https://crontab.guru/" accessibilityLabel="Cron format documentation">
-              <Text style={{ color: c.accent, fontSize: 12 }}>crontab.guru</Text>
+            <ExternalLink href="https://crontab.cronhub.io/" accessibilityLabel="Cron format documentation">
+              <Text style={{ color: c.accent, fontSize: 12 }}>crontab.cronhub.io</Text>
             </ExternalLink>
           </View>
           <HostTextInput value={value} onChangeText={onChange} style={inputStyle(c)} autoCapitalize="none" autoCorrect={false} placeholder="0 9 * * 1-5" placeholderTextColor={c.foregroundMuted} />
