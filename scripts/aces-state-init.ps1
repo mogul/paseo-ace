@@ -5,9 +5,9 @@
   backed up, and rolled back.
 
 .USAGE
-  .\scripts\ace-state-init.ps1 <origin-url>
+  .\scripts\aces-state-init.ps1 <origin-url>
 
-  .\scripts\ace-state-init.ps1 https://github.com/user/paseo-aces-state.git
+  .\scripts\aces-state-init.ps1 https://github.com/user/paseo-aces-state.git
 
 .STATE DIR
   The git repo is created at:
@@ -34,8 +34,8 @@ param(
 )
 
 if (-not $OriginUrl) {
-  Write-Host "Usage: .\scripts\ace-state-init.ps1 <origin-url>"
-  Write-Host "Example: .\scripts\ace-state-init.ps1 https://github.com/user/paseo-aces-state.git"
+  Write-Host "Usage: .\scripts\aces-state-init.ps1 <origin-url>"
+  Write-Host "Example: .\scripts\aces-state-init.ps1 https://github.com/user/paseo-aces-state.git"
   exit 1
 }
 

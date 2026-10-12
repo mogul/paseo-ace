@@ -22,7 +22,7 @@
   framework files (`BOARD.md`/`HEARTBEAT.md`) and preserves learned files.
 - **Presence** — the board banner shows associated teammates (emoji row),
   lit when actively running.
-- **State-as-git** — state consolidated to `~/.paseo/aces/`; `scripts/ace-state-init.ps1`
+- **State-as-git** — state consolidated to `~/.paseo/aces/`; `scripts/aces-state-init.ps1`
   sets up git for backup/rollback/sharing.
 
 ## Next

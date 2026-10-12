@@ -142,7 +142,7 @@ function migrate(): void {
 }
 
 // Read-only coupling to the `aces-boards` plugin's board store. This is the only touch
-// point between the two plugins; treat ace's BoardsData schema as the contract
+// point between the two plugins; treat aces-boards' BoardsData schema as the contract
 // and never write to it from here.
 export function readBoards(): BoardSummary[] {
   const base = process.env.PASEO_HOME || join(homedir(), ".paseo");

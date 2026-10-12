@@ -79,8 +79,8 @@ To version-control this directory, run the one-shot setup script with your
 remote as the argument:
 
 ```
-.\scripts\ace-state-init.ps1 https://github.com/user/paseo-aces-state.git
-./scripts/ace-state-init.sh  https://github.com/user/paseo-aces-state.git
+.\scripts\aces-state-init.ps1 https://github.com/user/paseo-aces-state.git
+./scripts/aces-state-init.sh  https://github.com/user/paseo-aces-state.git
 ```
 
 After that, from inside `~/.paseo/aces`:

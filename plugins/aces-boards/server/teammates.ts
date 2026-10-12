@@ -4,7 +4,7 @@ import { join } from "node:path";
 import type { BoardTeammate } from "../shared/contracts";
 
 // Read-only coupling to the `aces-teammates` plugin's state via the filesystem
-// contract (the same way aces-teammates reads ace's boards.json). We read
+// contract (the same way aces-teammates reads aces-boards' boards.json). We read
 // teammates.json for the teammate roster and active.json for the currently
 // running set. Treat aces-teammates' file shapes as the contract and never write
 // to them from here.

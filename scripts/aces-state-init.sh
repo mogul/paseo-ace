@@ -5,8 +5,8 @@
 # backed up, and rolled back.
 #
 # Usage:
-#   ./scripts/ace-state-init.sh <origin-url>
-#   ./scripts/ace-state-init.sh https://github.com/user/paseo-aces-state.git
+#   ./scripts/aces-state-init.sh <origin-url>
+#   ./scripts/aces-state-init.sh https://github.com/user/paseo-aces-state.git
 #
 # State dir (the git repo):
 #   "$PASEO_HOME/aces"       if PASEO_HOME is set
@@ -26,8 +26,8 @@ set -uo pipefail
 
 if [ "$#" -ne 1 ]; then
   echo "Error: expected exactly one argument (the origin URL)." >&2
-  echo "Usage: ./scripts/ace-state-init.sh <origin-url>" >&2
-  echo "Example: ./scripts/ace-state-init.sh https://github.com/user/paseo-aces-state.git" >&2
+  echo "Usage: ./scripts/aces-state-init.sh <origin-url>" >&2
+  echo "Example: ./scripts/aces-state-init.sh https://github.com/user/paseo-aces-state.git" >&2
   exit 1
 fi
 ORIGIN_URL="$1"

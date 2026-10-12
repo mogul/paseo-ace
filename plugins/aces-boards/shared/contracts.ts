@@ -93,7 +93,7 @@ export const BoardSummarySchema = z.object({ id: z.string(), name: z.string() })
 export type BoardSummary = z.infer<typeof BoardSummarySchema>;
 
 // Read-only coupling to the `aces-teammates` plugin via the filesystem contract
-// (~/.paseo/aces/teammates.json + active.json). Only the fields ace needs to
+// (~/.paseo/aces/teammates.json + active.json). Only the fields aces-boards needs to
 // render presence on the board.
 export const BoardTeammateSchema = z.object({
   id: z.string().min(1),

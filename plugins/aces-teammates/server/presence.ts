@@ -3,9 +3,9 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 
 // Ephemeral "who is currently running" state, shared with the `aces-boards` board via a
-// filesystem contract (ace reads active.json the same way aces-teammates reads
+// filesystem contract (aces-boards reads active.json the same way aces-teammates reads
 // boards.json). It is NOT part of the state repo's git history — see
-// scripts/ace-state-init.ps1, which git-ignores active.json. It may go stale if
+// scripts/aces-state-init.ps1, which git-ignores active.json. It may go stale if
 // the daemon restarts mid-run, which is acceptable for a presence indicator.
 
 function acesBaseDir(): string {
