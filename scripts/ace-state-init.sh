@@ -24,12 +24,25 @@
 #
 set -uo pipefail
 
-if [ "$#" -lt 1 ]; then
-  echo "Usage: ./scripts/ace-state-init.sh <origin-url>"
-  echo "Example: ./scripts/ace-state-init.sh https://github.com/user/paseo-ace-state.git"
+if [ "$#" -ne 1 ]; then
+  echo "Error: expected exactly one argument (the origin URL)." >&2
+  echo "Usage: ./scripts/ace-state-init.sh <origin-url>" >&2
+  echo "Example: ./scripts/ace-state-init.sh https://github.com/user/paseo-ace-state.git" >&2
   exit 1
 fi
 ORIGIN_URL="$1"
+
+case "$ORIGIN_URL" in
+  *[[:space:]]*)
+    echo "Error: the origin URL must not contain spaces." >&2
+    exit 1
+    ;;
+esac
+if [[ ! "$ORIGIN_URL" =~ (://|@|:) ]]; then
+  echo "Error: '$ORIGIN_URL' does not look like a git remote URL." >&2
+  echo "  Expected https://github.com/user/repo.git or git@github.com:user/repo.git" >&2
+  exit 1
+fi
 
 BASE="${PASEO_HOME:-$HOME/.paseo}"
 STATE_DIR="$BASE/ace"
@@ -67,4 +80,9 @@ if [ -z "$(git remote)" ]; then
 fi
 
 git branch -M main
-git push -u origin main
+if git push -u origin main; then
+  echo "Pushed state to $ORIGIN_URL."
+else
+  echo "Error: git push failed. Check the URL and your credentials." >&2
+  exit 1
+fi

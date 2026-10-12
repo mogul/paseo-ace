@@ -39,6 +39,17 @@ if (-not $OriginUrl) {
   exit 1
 }
 
+if ($OriginUrl -match "\s") {
+  Write-Host "Error: the origin URL must not contain spaces." -ForegroundColor Red
+  exit 1
+}
+
+if ($OriginUrl -notmatch "(://|@|:)") {
+  Write-Host "Error: '$OriginUrl' does not look like a git remote URL." -ForegroundColor Red
+  Write-Host "  Expected https://github.com/user/repo.git or git@github.com:user/repo.git"
+  exit 1
+}
+
 $base = if ($env:PASEO_HOME) { $env:PASEO_HOME } else { Join-Path $env:USERPROFILE ".paseo" }
 $stateDir = Join-Path $base "ace"
 
@@ -90,6 +101,11 @@ try {
 
   git branch -M main
   git push -u origin main
+  if ($LASTEXITCODE -ne 0) {
+    Write-Host "Error: git push failed. Check the URL and your credentials." -ForegroundColor Red
+    exit 1
+  }
+  Write-Host "Pushed state to $OriginUrl."
 }
 finally {
   Pop-Location
