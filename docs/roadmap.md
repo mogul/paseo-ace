@@ -40,7 +40,7 @@
   reachable (real brand icons are SVG, not exposed to plugins).
 - **Note/artifact slots** on cards (markdown notes maintained by agents).
 - **Scheduled / lifecycle-triggered prompts** — covered by Paseo's own
-  `schedules`; a future `ace` feature if needed.
+  `schedules`; a future `ace-boards` feature if needed.
 - **Agent "fork"** in zone triggers — not exposed by the plugin SDK.
 
 ## Verify-before-more

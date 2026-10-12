@@ -3,7 +3,7 @@
 ACE is a suite of two [Paseo](https://paseo.sh) plugins that bring Agor-style,
 board-based orchestration and persistent AI teammates to Paseo:
 
-- **`ace`** — a board of **zones** where each **workspace** is a card showing its
+- **`ace-boards`** — a board of **zones** where each **workspace** is a card showing its
   branch, pull request, issue pills, and a live session tree. Move a card into a
   zone to run that zone's prompt, or use zones as status flags. Multiple boards,
   per-board card defaults, create/find cards, and a board MCP so agents can read
@@ -24,7 +24,7 @@ orchestrate.
 
 | Plugin | ID | What it does |
 | --- | --- | --- |
-| Board | `ace` | Zones + workspace cards (branch/PR/sessions), move-to-zone triggers, multiple boards + card defaults, board MCP |
+| Board | `ace-boards` | Zones + workspace cards (branch/PR/sessions), move-to-zone triggers, multiple boards + card defaults, board MCP |
 | Teammates | `ace-teammates` | Persistent identity + file memory, bench UI, personas + emoji, memory MCP, heartbeat supervisor |
 
 ## Install
@@ -32,14 +32,14 @@ orchestrate.
 From this repository (`github:mogul/paseo-ace`):
 
 ```
-paseo plugin install github:mogul/paseo-ace:plugins/ace
+paseo plugin install github:mogul/paseo-ace:plugins/ace-boards
 paseo plugin install github:mogul/paseo-ace:plugins/ace-teammates
 ```
 
 Or from a local checkout:
 
 ```
-paseo plugin install /absolute/path/to/paseo-ace/plugins/ace
+paseo plugin install /absolute/path/to/paseo-ace/plugins/ace-boards
 paseo plugin install /absolute/path/to/paseo-ace/plugins/ace-teammates
 ```
 

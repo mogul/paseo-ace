@@ -12,7 +12,7 @@
 #   "$PASEO_HOME/ace"        if PASEO_HOME is set
 #   "$HOME/.paseo/ace"       otherwise
 #
-# Both the `ace` plugin (boards.json) and the `ace-teammates` plugin
+# Both the `ace-boards` plugin (boards.json) and the `ace-teammates` plugin
 # (teammates.json + teammates/<slug>/ dirs) live under this directory.
 #
 # Recurring commands (run from inside the state dir, i.e. cd "$HOME/.paseo/ace"):

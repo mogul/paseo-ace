@@ -61,7 +61,7 @@ export default function contribute(server: PluginServerContext) {
         ...request.config,
         mcpServers: {
           ...request.config.mcpServers,
-          ace: { type: "http", url: mcpServer.url(), alwaysLoad: true },
+          "ace-boards": { type: "http", url: mcpServer.url(), alwaysLoad: true },
         },
       },
     };

@@ -17,5 +17,6 @@ Key decisions for the `ace` plugin, newest last. Each record is immutable once a
 | [0011](0011-teammates.md) | Teammates (persistent identity + file memory, separate plugin) | Accepted |
 | [0012](0012-teammate-board-relationship.md) | Teammate ↔ board relationship (soft 1:1 resident board) | Accepted |
 | [0013](0013-supervisor-heartbeat.md) | Supervisor (board-resident agent via heartbeat) | Accepted |
+| [0014](0014-rename-boards-plugin.md) | Rename boards plugin to `ace-boards` | Accepted |
 
 See `../architecture.md` for the current shape of the system.

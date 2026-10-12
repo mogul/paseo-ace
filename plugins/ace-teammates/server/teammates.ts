@@ -134,7 +134,7 @@ function migrate(): void {
   }
 }
 
-// Read-only coupling to the `ace` plugin's board store. This is the only touch
+// Read-only coupling to the `ace-boards` plugin's board store. This is the only touch
 // point between the two plugins; treat ace's BoardsData schema as the contract
 // and never write to it from here.
 export function readAceBoards(): BoardSummary[] {

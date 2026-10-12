@@ -15,7 +15,7 @@
     $env:PASEO_HOME\ace        if PASEO_HOME is set
     $env:USERPROFILE\.paseo\ace  otherwise
 
-  Both the `ace` plugin (boards.json) and the `ace-teammates` plugin
+  Both the `ace-boards` plugin (boards.json) and the `ace-teammates` plugin
   (teammates.json + teammates/<slug>/ dirs) live under this directory.
 
 .RECURRING COMMANDS

@@ -98,7 +98,7 @@ export class McpServer {
         this.respond(res, id, {
           protocolVersion: "2024-11-05",
           capabilities: { tools: {} },
-          serverInfo: { name: "ace", version: "0.1.0" },
+          serverInfo: { name: "ace-boards", version: "0.1.0" },
         });
         return;
       case "tools/list":

@@ -2,7 +2,7 @@ import { mkdirSync, renameSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-// Ephemeral "who is currently running" state, shared with the `ace` board via a
+// Ephemeral "who is currently running" state, shared with the `ace-boards` board via a
 // filesystem contract (ace reads active.json the same way ace-teammates reads
 // boards.json). It is NOT part of the state repo's git history — see
 // scripts/ace-state-init.ps1, which git-ignores active.json. It may go stale if
