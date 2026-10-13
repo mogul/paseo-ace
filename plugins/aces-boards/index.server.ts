@@ -15,7 +15,9 @@ import {
   boardRenameRpc,
   boardSetDefaultsRpc,
   boardSetLastVisitedRpc,
+  boardStartTeammateRpc,
   boardStateRpc,
+  boardTeammateSessionsRpc,
   boardTeammatesRpc,
   boardUpdateZoneRpc,
   boardWorkspacesRpc,
@@ -23,7 +25,8 @@ import {
 import { BoardStore } from "./server/board";
 import { BoardEngine } from "./server/engine";
 import { buildAllWorkspaceCards, buildWorkspaceCards } from "./server/state";
-import { readBoardTeammates } from "./server/teammates";
+import { DEFAULT_TEAMMATE_PROVIDER, TEAMMATE_HEARTBEAT_LABEL, TEAMMATE_ID_LABEL, buildTeammateSystemPrompt } from "./server/teammate-prompt";
+import { readBoardTeammates, readTeammateStart } from "./server/teammates";
 import { McpServer } from "./server/mcp";
 
 export default function contribute(server: PluginServerContext) {
@@ -95,6 +98,32 @@ export default function contribute(server: PluginServerContext) {
   server.handle(boardTeammatesRpc, () => {
     const { teammates, active } = readBoardTeammates();
     return { teammates, active };
+  });
+
+  server.handle(boardStartTeammateRpc, async ({ teammateId }, { paseo }) => {
+    capturePaseo(paseo);
+    const teammate = readTeammateStart(teammateId);
+    if (!teammate) throw new Error(`Teammate not found: ${teammateId}`);
+    const systemPrompt = buildTeammateSystemPrompt({ name: teammate.name, id: teammate.id, homeDir: teammate.homeDir });
+    const agent = await paseo.agents.create({
+      config: { provider: teammate.provider || DEFAULT_TEAMMATE_PROVIDER, thinkingOptionId: teammate.thinkingOptionId, systemPrompt },
+      cwd: teammate.homeDir,
+      title: teammate.name,
+      labels: { [TEAMMATE_ID_LABEL]: teammate.id },
+    });
+    return { agentId: agent.id };
+  });
+
+  server.handle(boardTeammateSessionsRpc, async ({ teammateId }, { paseo }) => {
+    capturePaseo(paseo);
+    const result = await paseo.agents.list();
+    const sessions = result.entries
+      .map((entry) => entry.agent)
+      .filter((agent) => !agent.archivedAt)
+      .filter((agent) => agent.labels?.[TEAMMATE_ID_LABEL] === teammateId)
+      .filter((agent) => !agent.labels?.[TEAMMATE_HEARTBEAT_LABEL])
+      .map((agent) => ({ id: agent.id, title: agent.title ?? "(untitled)" }));
+    return { sessions };
   });
 
   server.handle(boardCreateRpc, ({ name }) => {

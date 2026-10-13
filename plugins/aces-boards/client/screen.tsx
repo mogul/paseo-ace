@@ -22,7 +22,9 @@ import {
   boardRenameRpc,
   boardSetDefaultsRpc,
   boardSetLastVisitedRpc,
+  boardStartTeammateRpc,
   boardStateRpc,
+  boardTeammateSessionsRpc,
   boardTeammatesRpc,
   boardUpdateZoneRpc,
   boardWorkspacesRpc,
@@ -160,6 +162,8 @@ export function BoardScreen({ theme, layout, navigation }: PluginScreenProps) {
   const setDefaults = useRpc(boardSetDefaultsRpc);
   const adoptCard = useRpc(boardAdoptCardRpc);
   const createCard = useRpc(boardCreateCardRpc);
+  const startTeammate = useRpc(boardStartTeammateRpc);
+  const getTeammateSessions = useRpc(boardTeammateSessionsRpc);
 
   const [selectedBoardId, setSelectedBoardId] = useState<string | null>(null);
   const [overlay, setOverlay] = useState<Overlay | null>(null);
@@ -376,6 +380,34 @@ export function BoardScreen({ theme, layout, navigation }: PluginScreenProps) {
       event.nativeEvent.pageX,
       event.nativeEvent.pageY,
     );
+  }
+
+  async function openTeammateMenu(event: { nativeEvent: { pageX: number; pageY: number } }, teammate: BoardTeammate) {
+    let sessions: { id: string; title: string }[] = [];
+    try {
+      sessions = (await getTeammateSessions({ teammateId: teammate.id })).sessions;
+    } catch {
+      sessions = [];
+    }
+    const items: MenuItem[] = [
+      {
+        label: "New session",
+        onPress: () => {
+          setMenu(null);
+          void startTeammate({ teammateId: teammate.id })
+            .then(({ agentId }) => navigation?.openAgent({ agentId }))
+            .catch((err) => toast.error(err instanceof Error ? err.message : String(err)));
+        },
+      },
+      ...sessions.map((s) => ({
+        label: s.title,
+        onPress: () => {
+          setMenu(null);
+          navigation?.openAgent({ agentId: s.id });
+        },
+      })),
+    ];
+    placeMenu(items, event.nativeEvent.pageX, event.nativeEvent.pageY);
   }
 
   function openZoneMenu(event: { nativeEvent: { pageX: number; pageY: number } }, zone: Zone) {
@@ -651,11 +683,8 @@ export function BoardScreen({ theme, layout, navigation }: PluginScreenProps) {
                 <Pressable
                   key={t.id}
                   accessibilityRole="button"
-                  accessibilityLabel={t.lastAgentId ? `Open ${t.name} latest session` : `${t.name} has no session yet`}
-                  onPress={() => {
-                    if (t.lastAgentId) navigation?.openAgent({ agentId: t.lastAgentId });
-                    else toast.show(`No session yet — start ${t.name} from the Teammates screen.`);
-                  }}
+                  accessibilityLabel={`${t.name} sessions`}
+                  onPress={(e) => openTeammateMenu(e, t)}
                   style={styles.teammateItem}
                 >
                   <Text style={[styles.teammateEmoji, !active && styles.teammateEmojiInactive]}>{t.emoji ?? "🤖"}</Text>

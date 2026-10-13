@@ -61,3 +61,25 @@ export function readBoardTeammates(): { teammates: BoardTeammate[]; active: stri
 
   return { teammates, active: [...active] };
 }
+
+export function readTeammateStart(id: string): { id: string; name: string; homeDir: string; provider?: string; thinkingOptionId?: string } | null {
+  try {
+    const path = join(acesBaseDir(), "teammates.json");
+    if (!existsSync(path)) return null;
+    const parsed = JSON.parse(readFileSync(path, "utf8")) as { teammates?: unknown };
+    if (!parsed || !Array.isArray(parsed.teammates)) return null;
+    const raw = (parsed.teammates as unknown[]).find((t) => !!t && typeof t === "object" && (t as { id?: unknown }).id === id);
+    if (!raw || typeof raw !== "object") return null;
+    const t = raw as { id?: unknown; name?: unknown; provider?: unknown; thinkingOptionId?: unknown };
+    if (typeof t.id !== "string" || typeof t.name !== "string") return null;
+    return {
+      id: t.id,
+      name: t.name,
+      homeDir: join(acesBaseDir(), "teammates", t.id),
+      provider: typeof t.provider === "string" ? t.provider : undefined,
+      thinkingOptionId: typeof t.thinkingOptionId === "string" ? t.thinkingOptionId : undefined,
+    };
+  } catch {
+    return null;
+  }
+}

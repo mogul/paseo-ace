@@ -238,4 +238,16 @@ export const boardCreateCardRpc = defineRpc({
   output: z.object({ workspaceId: z.string() }),
 });
 
+export const boardStartTeammateRpc = defineRpc({
+  name: "board.start-teammate",
+  input: z.object({ teammateId: z.string().min(1) }).strict(),
+  output: z.object({ agentId: z.string() }),
+});
+
+export const boardTeammateSessionsRpc = defineRpc({
+  name: "board.teammate-sessions",
+  input: z.object({ teammateId: z.string().min(1) }).strict(),
+  output: z.object({ sessions: z.array(z.object({ id: z.string(), title: z.string() })) }),
+});
+
 export const UNASSIGNED_CARD_ID = "__unassigned__";
