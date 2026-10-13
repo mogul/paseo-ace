@@ -78,9 +78,9 @@ export default function contribute(server: PluginServerContext) {
     const teammate = store.create(name, description, provider, thinkingOptionId, resolvedBoardId, resolvedBoardName, heartbeatCron, persona, emoji);
 
     const { systemPrompt, provider: resolvedProvider, thinkingOptionId: resolvedThinking } = buildSystemPrompt(store, teammate.id);
-    const agent = await paseo.agents.create({
+    const homeWorkspaceId = await store.ensureWorkspace(teammate.id, paseo);
+    const agent = await paseo.workspaces.ref(homeWorkspaceId).agents.create({
       config: { provider: resolvedProvider, thinkingOptionId: resolvedThinking, systemPrompt },
-      cwd: store.memoryPath(teammate.id),
       title: teammate.name,
       prompt: heartbeatCron ? buildHeartbeatPrompt(teammate) : "Introduce yourself and orient to your board.",
       labels: { [TEAMMATE_ID_LABEL]: teammate.id },
@@ -107,26 +107,17 @@ export default function contribute(server: PluginServerContext) {
     return store.syncFramework(id);
   });
 
-  server.handle(teammateStartRpc, async ({ id, workspaceId }, { paseo }) => {
+  server.handle(teammateStartRpc, async ({ id }, { paseo }) => {
     capturePaseo(paseo);
     if (!paseoApi) throw new Error("Paseo API is not available yet.");
     const { name, systemPrompt, provider, thinkingOptionId } = buildSystemPrompt(store, id);
-    let agentId: string;
-    if (workspaceId) {
-      const agent = await paseo.workspaces.ref(workspaceId).agents.create({
-        config: { provider, thinkingOptionId, systemPrompt },
-        title: name,
-        labels: { [TEAMMATE_ID_LABEL]: id },
-      });
-      agentId = agent.id;
-    } else {
-      const agent = await paseo.agents.create({
-        config: { provider, thinkingOptionId, systemPrompt },
-        cwd: store.memoryPath(id),
-        labels: { [TEAMMATE_ID_LABEL]: id },
-      });
-      agentId = agent.id;
-    }
+    const homeWorkspaceId = await store.ensureWorkspace(id, paseo);
+    const agent = await paseo.workspaces.ref(homeWorkspaceId).agents.create({
+      config: { provider, thinkingOptionId, systemPrompt },
+      title: name,
+      labels: { [TEAMMATE_ID_LABEL]: id },
+    });
+    const agentId = agent.id;
     presence.markActive(id, agentId);
     store.setLastAgentId(id, agentId);
     store.clearSyncConflict(id);

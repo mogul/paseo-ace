@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { BoardTeammate } from "../shared/contracts";
@@ -62,7 +62,7 @@ export function readBoardTeammates(): { teammates: BoardTeammate[]; active: stri
   return { teammates, active: [...active] };
 }
 
-export function readTeammateStart(id: string): { id: string; name: string; homeDir: string; provider?: string; thinkingOptionId?: string } | null {
+export function readTeammateStart(id: string): { id: string; name: string; homeDir: string; provider?: string; thinkingOptionId?: string; workspaceId?: string } | null {
   try {
     const path = join(acesBaseDir(), "teammates.json");
     if (!existsSync(path)) return null;
@@ -70,7 +70,7 @@ export function readTeammateStart(id: string): { id: string; name: string; homeD
     if (!parsed || !Array.isArray(parsed.teammates)) return null;
     const raw = (parsed.teammates as unknown[]).find((t) => !!t && typeof t === "object" && (t as { id?: unknown }).id === id);
     if (!raw || typeof raw !== "object") return null;
-    const t = raw as { id?: unknown; name?: unknown; provider?: unknown; thinkingOptionId?: unknown };
+    const t = raw as { id?: unknown; name?: unknown; provider?: unknown; thinkingOptionId?: unknown; workspaceId?: unknown };
     if (typeof t.id !== "string" || typeof t.name !== "string") return null;
     return {
       id: t.id,
@@ -78,8 +78,32 @@ export function readTeammateStart(id: string): { id: string; name: string; homeD
       homeDir: join(acesBaseDir(), "teammates", t.id),
       provider: typeof t.provider === "string" ? t.provider : undefined,
       thinkingOptionId: typeof t.thinkingOptionId === "string" ? t.thinkingOptionId : undefined,
+      workspaceId: typeof t.workspaceId === "string" ? t.workspaceId : undefined,
     };
   } catch {
     return null;
+  }
+}
+
+export function setTeammateWorkspaceId(id: string, workspaceId: string): void {
+  try {
+    const dir = acesBaseDir();
+    const path = join(dir, "teammates.json");
+    if (!existsSync(path)) return;
+    const parsed = JSON.parse(readFileSync(path, "utf8")) as { teammates?: unknown };
+    if (!parsed || !Array.isArray(parsed.teammates)) return;
+    for (const raw of parsed.teammates) {
+      if (!raw || typeof raw !== "object") continue;
+      const t = raw as { id?: unknown };
+      if (t.id === id) {
+        (raw as { workspaceId?: string }).workspaceId = workspaceId;
+        const tmp = path + ".tmp";
+        writeFileSync(tmp, JSON.stringify(parsed, null, 2), "utf8");
+        renameSync(tmp, path);
+        return;
+      }
+    }
+  } catch {
+    // ignore
   }
 }

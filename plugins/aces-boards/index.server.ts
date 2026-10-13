@@ -26,7 +26,7 @@ import { BoardStore } from "./server/board";
 import { BoardEngine } from "./server/engine";
 import { buildAllWorkspaceCards, buildWorkspaceCards } from "./server/state";
 import { DEFAULT_TEAMMATE_PROVIDER, TEAMMATE_HEARTBEAT_LABEL, TEAMMATE_ID_LABEL, buildTeammateSystemPrompt } from "./server/teammate-prompt";
-import { readBoardTeammates, readTeammateStart } from "./server/teammates";
+import { readBoardTeammates, readTeammateStart, setTeammateWorkspaceId } from "./server/teammates";
 import { McpServer } from "./server/mcp";
 
 export default function contribute(server: PluginServerContext) {
@@ -144,10 +144,15 @@ export default function contribute(server: PluginServerContext) {
     capturePaseo(paseo);
     const teammate = readTeammateStart(teammateId);
     if (!teammate) throw new Error(`Teammate not found: ${teammateId}`);
+    let workspaceId = teammate.workspaceId;
+    if (!workspaceId) {
+      const workspace = await paseo.workspaces.create({ source: { kind: "directory", path: teammate.homeDir }, title: teammate.name });
+      workspaceId = workspace.id;
+      setTeammateWorkspaceId(teammate.id, workspaceId);
+    }
     const systemPrompt = buildTeammateSystemPrompt({ name: teammate.name, id: teammate.id, homeDir: teammate.homeDir });
-    const agent = await paseo.agents.create({
+    const agent = await paseo.workspaces.ref(workspaceId).agents.create({
       config: { provider: teammate.provider || DEFAULT_TEAMMATE_PROVIDER, thinkingOptionId: teammate.thinkingOptionId, systemPrompt },
-      cwd: teammate.homeDir,
       title: teammate.name,
       labels: { [TEAMMATE_ID_LABEL]: teammate.id },
     });

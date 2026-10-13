@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { appendFileSync, copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import type { PaseoApi } from "@getpaseo/client";
 import type { BoardSummary, Teammate } from "../shared/contracts";
 import { getPersona } from "../shared/personas";
 import { addTeammateWorktree, frameworkBaseBranch, syncTeammateBranch } from "./framework";
@@ -15,6 +16,7 @@ interface TeammateRecord {
   provider?: string;
   thinkingOptionId?: string;
   lastAgentId?: string;
+  workspaceId?: string;
   boardId?: string;
   boardName?: string;
   heartbeatCron?: string;
@@ -415,6 +417,15 @@ export class TeammateStore {
       record.syncConflict = false;
       this.persist();
     }
+  }
+
+  async ensureWorkspace(id: string, paseo: PaseoApi): Promise<string> {
+    const record = this.record(id);
+    if (record.workspaceId) return record.workspaceId;
+    const workspace = await paseo.workspaces.create({ source: { kind: "directory", path: this.memoryPath(id) }, title: record.name });
+    record.workspaceId = workspace.id;
+    this.persist();
+    return workspace.id;
   }
 
   delete(id: string): void {

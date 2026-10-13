@@ -9,6 +9,7 @@ export const TeammateSchema = z.object({
   provider: z.string().optional(),
   thinkingOptionId: z.string().optional(),
   lastAgentId: z.string().optional(),
+  workspaceId: z.string().optional(),
   boardId: z.string().optional(),
   boardName: z.string().optional(),
   heartbeatCron: z.string().optional(),
