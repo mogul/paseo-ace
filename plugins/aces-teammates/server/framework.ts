@@ -56,6 +56,7 @@ function bootstrapRepo(): void {
   run("git init", dir);
   run("git config user.name aces", dir);
   run("git config user.email aces@localhost", dir);
+  run("git config commit.gpgsign false", dir);
 
   writeFile(dir, "AGENTS.md", AGENTS_SEED);
   writeFile(dir, "BOOT.md", BOOT_SEED);
