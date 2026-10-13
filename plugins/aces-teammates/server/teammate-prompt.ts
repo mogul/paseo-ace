@@ -5,6 +5,9 @@ import { join } from "node:path";
 
 export const DEFAULT_TEAMMATE_PROVIDER = "opencode/opencode-go/deepseek-v4-flash";
 
+export const TEAMMATE_ID_LABEL = "paseo.teammate-id";
+export const TEAMMATE_HEARTBEAT_LABEL = "paseo.teammate-heartbeat";
+
 function readFile(homeDir: string, filename: string): string {
   const path = join(homeDir, filename);
   return existsSync(path) ? readFileSync(path, "utf8") : "";

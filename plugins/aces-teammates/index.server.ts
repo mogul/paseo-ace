@@ -14,6 +14,7 @@ import { McpServer } from "./server/mcp";
 import { PresenceTracker } from "./server/presence";
 import { HeartbeatScheduler, buildHeartbeatPrompt } from "./server/scheduler";
 import { buildSystemPrompt, createBoard, FRAMEWORK_VERSION, readBoards, TeammateStore } from "./server/teammates";
+import { TEAMMATE_ID_LABEL } from "./server/teammate-prompt";
 
 export default function contribute(server: PluginServerContext) {
   const store = new TeammateStore();
@@ -82,6 +83,7 @@ export default function contribute(server: PluginServerContext) {
       cwd: store.memoryPath(teammate.id),
       title: teammate.name,
       prompt: heartbeatCron ? buildHeartbeatPrompt(teammate) : "Introduce yourself and orient to your board.",
+      labels: { [TEAMMATE_ID_LABEL]: teammate.id },
     });
     presence.markActive(teammate.id, agent.id);
     store.setLastAgentId(teammate.id, agent.id);
@@ -114,12 +116,14 @@ export default function contribute(server: PluginServerContext) {
       const agent = await paseo.workspaces.ref(workspaceId).agents.create({
         config: { provider, thinkingOptionId, systemPrompt },
         title: name,
+        labels: { [TEAMMATE_ID_LABEL]: id },
       });
       agentId = agent.id;
     } else {
       const agent = await paseo.agents.create({
         config: { provider, thinkingOptionId, systemPrompt },
         cwd: store.memoryPath(id),
+        labels: { [TEAMMATE_ID_LABEL]: id },
       });
       agentId = agent.id;
     }
@@ -131,7 +135,7 @@ export default function contribute(server: PluginServerContext) {
 
   server.on("agent.created", (_event, { paseo }) => capturePaseo(paseo));
   server.on("agent.turn_started", (_event, { paseo }) => capturePaseo(paseo));
-  server.on("agent.turn_ended", (event) => scheduler.onTurnEnded(event.agent.id));
+  server.on("agent.turn_ended", (event, { paseo }) => void scheduler.onTurnEnded(event.agent.id, paseo));
 
   return () => {
     scheduler.stop();

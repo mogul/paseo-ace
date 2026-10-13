@@ -2,6 +2,7 @@ import type { PaseoApi } from "@getpaseo/client";
 import type { Teammate } from "../shared/contracts";
 import { PresenceTracker } from "./presence";
 import { buildSystemPrompt, type TeammateStore } from "./teammates";
+import { TEAMMATE_HEARTBEAT_LABEL, TEAMMATE_ID_LABEL } from "./teammate-prompt";
 
 const TICK_MS = 20_000;
 
@@ -115,12 +116,13 @@ export class HeartbeatScheduler {
     }
   }
 
-  onTurnEnded(agentId: string): void {
+  onTurnEnded(agentId: string, paseo: PaseoApi): void {
     // Clear presence for any agent (heartbeat- or start-spawned) that finished.
     this.presence.onTurnEnded(agentId);
     for (const [teammateId, liveId] of this.live) {
       if (liveId === agentId) {
         this.live.delete(teammateId);
+        void paseo.agents.ref(agentId).archive().catch(() => {});
         return;
       }
     }
@@ -153,6 +155,7 @@ export class HeartbeatScheduler {
         cwd: this.store.memoryPath(teammate.id),
         title: name,
         prompt: buildHeartbeatPrompt(teammate),
+        labels: { [TEAMMATE_ID_LABEL]: teammate.id, [TEAMMATE_HEARTBEAT_LABEL]: "true" },
       });
       this.live.set(teammate.id, agent.id);
       this.presence.markActive(teammate.id, agent.id);
