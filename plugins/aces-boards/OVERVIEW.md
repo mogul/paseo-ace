@@ -12,7 +12,7 @@ Requires Paseo 0.11.2 or later. The daemon machine needs the providers reference
 
 ## Boards, zones, and cards
 
-A board is a set of zones arranged in columns. A zone has a name and an optional trigger (session mode new or reuse, action prompt or spawn, a provider, and a templated prompt). A zone with no trigger is a status flag. Each board has card defaults that the Create card flow uses to make new workspace cards, including an isolation mode, a base branch, and a provider and model.
+A board is a set of zones arranged in groups. A zone has a name and an optional trigger (session mode new or reuse, action prompt or spawn, a provider, and a templated prompt). A zone with no trigger is a status flag. Each board has card defaults that the Create card flow uses to make new workspace cards, including an isolation mode, a base branch, and a provider and model.
 
 Cards are workspaces. They show the workspace name, its git branch, a pull request pill, issue pills (workspace labels with an `issue:` prefix), and a collapsible session tree. Cards move between zones and between boards.
 

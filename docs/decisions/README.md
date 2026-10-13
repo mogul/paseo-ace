@@ -18,5 +18,7 @@ Key decisions for the `ace` plugin, newest last. Each record is immutable once a
 | [0012](0012-teammate-board-relationship.md) | Teammate ↔ board relationship (soft 1:1 resident board) | Accepted |
 | [0013](0013-supervisor-heartbeat.md) | Supervisor (board-resident agent via heartbeat) | Accepted |
 | [0014](0014-rename-boards-plugin.md) | Rename boards plugin to `ace-boards` | Accepted |
+| [0015](0015-column-zone-layout-drag.md) | Column/zone layout: stacked zones, nameless columns, grip drag | Accepted |
+| [0016](0016-group-terminology.md) | Rename column to group | Accepted |
 
 See `../architecture.md` for the current shape of the system.

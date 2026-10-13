@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { PaseoApi } from "@getpaseo/client";
-import { UNASSIGNED_CARD_ID, type Board, type Zone, type ZoneTrigger } from "../shared/contracts";
+import { UNASSIGNED_CARD_ID, type Board, type BoardGroup, type Zone, type ZoneTrigger } from "../shared/contracts";
 import { renderTemplate, type TemplateContext } from "../shared/template";
 import { BoardStore } from "./board";
 
@@ -47,19 +47,64 @@ export class BoardEngine {
     this.paseo = paseo;
   }
 
-  addZone(boardId: string): void {
+  addZone(boardId: string, groupId?: string): void {
     const id = "zone-" + randomUUID().slice(0, 8);
-    const columnId = "col-" + randomUUID().slice(0, 8);
+    if (groupId) {
+      const board = this.store.get(boardId);
+      if (!board.groups.some((c) => c.id === groupId)) throw new Error(`Group not found: ${groupId}`);
+      this.store.update(boardId, (b) => {
+        const group = b.groups.find((c) => c.id === groupId);
+        if (group) group.zones.push({ id, title: "New zone" });
+      });
+      return;
+    }
+    const newGroupId = "col-" + randomUUID().slice(0, 8);
     this.store.update(boardId, (board) => {
-      board.columns.push({ id: columnId, title: "New zone", zones: [{ id, title: "New zone" }] });
+      board.groups.push({ id: newGroupId, title: "New zone", zones: [{ id, title: "New zone" }] });
+    });
+  }
+
+  moveGroup(boardId: string, groupId: string, index: number): void {
+    const board = this.store.get(boardId);
+    const from = board.groups.findIndex((c) => c.id === groupId);
+    if (from === -1) throw new Error(`Group not found: ${groupId}`);
+    this.store.update(boardId, (b) => {
+      const [group] = b.groups.splice(from, 1);
+      const clamped = Math.max(0, Math.min(index, b.groups.length));
+      b.groups.splice(clamped, 0, group);
+    });
+  }
+
+  moveZone(boardId: string, zoneId: string, groupId: string, index: number): void {
+    const board = this.store.get(boardId);
+    const zone = this.findZone(board, zoneId);
+    if (!zone) throw new Error(`Zone not found: ${zoneId}`);
+    if (!board.groups.some((c) => c.id === groupId)) throw new Error(`Group not found: ${groupId}`);
+    this.store.update(boardId, (b) => {
+      let sourceGroup: BoardGroup | undefined;
+      for (const group of b.groups) {
+        const i = group.zones.findIndex((z) => z.id === zoneId);
+        if (i === -1) continue;
+        group.zones.splice(i, 1);
+        sourceGroup = group;
+        break;
+      }
+      const target = b.groups.find((c) => c.id === groupId);
+      if (target) {
+        const clamped = Math.max(0, Math.min(index, target.zones.length));
+        target.zones.splice(clamped, 0, zone);
+      }
+      if (sourceGroup && sourceGroup.zones.length === 0) {
+        b.groups = b.groups.filter((c) => c.id !== sourceGroup!.id);
+      }
     });
   }
 
   updateZone(boardId: string, zoneId: string, patch: { title?: string; trigger?: ZoneTrigger | null }): void {
     if (!this.findZone(this.store.get(boardId), zoneId)) throw new Error(`Zone not found: ${zoneId}`);
     this.store.update(boardId, (board) => {
-      for (const column of board.columns) {
-        for (const zone of column.zones) {
+      for (const group of board.groups) {
+        for (const zone of group.zones) {
           if (zone.id !== zoneId) continue;
           if (patch.title !== undefined) zone.title = patch.title;
           if (patch.trigger !== undefined) zone.trigger = patch.trigger ?? undefined;
@@ -72,12 +117,12 @@ export class BoardEngine {
     const board = this.store.get(boardId);
     if (!this.findZone(board, zoneId)) throw new Error(`Zone not found: ${zoneId}`);
     this.store.update(boardId, (b) => {
-      for (const column of b.columns) {
-        const index = column.zones.findIndex((z) => z.id === zoneId);
+      for (const group of b.groups) {
+        const index = group.zones.findIndex((z) => z.id === zoneId);
         if (index === -1) continue;
-        column.zones.splice(index, 1);
-        if (column.zones.length === 0) {
-          b.columns = b.columns.filter((c) => c.id !== column.id);
+        group.zones.splice(index, 1);
+        if (group.zones.length === 0) {
+          b.groups = b.groups.filter((c) => c.id !== group.id);
         }
         break;
       }
@@ -178,8 +223,8 @@ export class BoardEngine {
   }
 
   private findZone(board: Board, zoneId: string): Zone | null {
-    for (const column of board.columns) {
-      for (const zone of column.zones) {
+    for (const group of board.groups) {
+      for (const zone of group.zones) {
         if (zone.id === zoneId) return zone;
       }
     }

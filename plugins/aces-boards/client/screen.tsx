@@ -5,7 +5,7 @@ import { Modal, ScrollView as HostScrollView, TextInput as HostTextInput, useToa
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { TextInput as NativeTextInput } from "react-native";
-import { Dimensions, Pressable, ScrollView, Text, View } from "react-native";
+import { Animated, Dimensions, Pressable, ScrollView, Text, View } from "react-native";
 import {
   UNASSIGNED_CARD_ID,
   boardAddZoneRpc,
@@ -14,7 +14,9 @@ import {
   boardCreateRpc,
   boardDeleteRpc,
   boardDeleteZoneRpc,
+  boardMoveGroupRpc,
   boardMoveRpc,
+  boardMoveZoneRpc,
   boardNewSessionRpc,
   boardProjectsRpc,
   boardRenameRpc,
@@ -25,6 +27,7 @@ import {
   boardUpdateZoneRpc,
   boardWorkspacesRpc,
   type Board,
+  type BoardGroup,
   type BoardSummary,
   type BoardTeammate,
   type CardDefaults,
@@ -34,6 +37,7 @@ import {
   type Zone,
   type ZoneTrigger,
 } from "../shared/contracts";
+import { DragSurface, measureInWindow, type DragFrames, type Frame, type Measurable } from "./dnd";
 
 const DEFAULT_PROVIDER = "opencode/opencode-go/deepseek-v4-flash";
 const SUGGESTED_PROMPT = "Review the working tree in {{workspace.directory}} and summarize what changed.";
@@ -66,6 +70,7 @@ type Overlay =
   | { kind: "move"; card: WorkspaceCard }
   | { kind: "pick-session"; card: WorkspaceCard; zone: Zone }
   | { kind: "create-find-card"; zone: Zone }
+  | { kind: "move-zone"; zone: Zone }
   | { kind: "new-board" }
   | { kind: "rename-board" }
   | { kind: "card-defaults" };
@@ -80,6 +85,51 @@ interface MenuState {
   x: number;
   y: number;
   items: MenuItem[];
+}
+
+type DropTarget = { kind: "group"; index: number } | { kind: "zone"; groupId: string; index: number };
+
+function computeIndicatorRect(board: Board, dragId: string, target: DropTarget, frames: DragFrames): { left: number; top: number; width: number; height: number } | null {
+  const colFrames = board.groups.map((c) => frames.groups[c.id]).filter((f): f is Frame => Boolean(f));
+  if (target.kind === "group") {
+    const remaining = board.groups.filter((c) => c.id !== dragId);
+    let x: number;
+    if (remaining.length === 0) {
+      const df = frames.groups[dragId];
+      x = df ? df.x + df.w : 0;
+    } else if (target.index === 0) {
+      const f = frames.groups[remaining[0].id];
+      x = f ? f.x : 0;
+    } else if (target.index >= remaining.length) {
+      const f = frames.groups[remaining[remaining.length - 1].id];
+      x = f ? f.x + f.w + 6 : 0;
+    } else {
+      const a = frames.groups[remaining[target.index - 1].id];
+      x = a ? a.x + a.w + 6 : 0;
+    }
+    const top = colFrames.length ? Math.min(...colFrames.map((f) => f.y)) : 0;
+    const height = colFrames.length ? Math.max(...colFrames.map((f) => f.h)) : 0;
+    return { left: x - frames.rootX, top: top - frames.rootY, width: 4, height };
+  }
+  const col = board.groups.find((c) => c.id === target.groupId);
+  const cf = col ? frames.groups[col.id] : undefined;
+  if (!col || !cf) return null;
+  const remaining = col.zones.filter((z) => z.id !== dragId);
+  let y: number;
+  if (remaining.length === 0) {
+    y = frames.zones[dragId] ? frames.zones[dragId].y : cf.y + 32;
+  } else if (target.index === 0) {
+    const f = frames.zones[remaining[0].id];
+    y = f ? f.y : cf.y;
+  } else if (target.index >= remaining.length) {
+    const f = frames.zones[remaining[remaining.length - 1].id];
+    y = f ? f.y + f.h : cf.y + cf.h;
+  } else {
+    const a = frames.zones[remaining[target.index - 1].id];
+    const b = frames.zones[remaining[target.index].id];
+    y = a && b ? (a.y + a.h + b.y) / 2 : 0;
+  }
+  return { left: cf.x - frames.rootX, top: y - frames.rootY, width: cf.w, height: 4 };
 }
 
 function slugify(name: string): string {
@@ -97,6 +147,8 @@ export function BoardScreen({ theme, layout, navigation }: PluginScreenProps) {
   const getTeammates = useRpc(boardTeammatesRpc);
   const move = useRpc(boardMoveRpc);
   const addZone = useRpc(boardAddZoneRpc);
+  const moveGroup = useRpc(boardMoveGroupRpc);
+  const moveZone = useRpc(boardMoveZoneRpc);
   const updateZone = useRpc(boardUpdateZoneRpc);
   const deleteZone = useRpc(boardDeleteZoneRpc);
   const newSession = useRpc(boardNewSessionRpc);
@@ -113,7 +165,16 @@ export function BoardScreen({ theme, layout, navigation }: PluginScreenProps) {
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [rootSize, setRootSize] = useState({ width: 0, height: 0 });
   const rootRef = useRef<View>(null);
+
+  const [drag, setDrag] = useState<{ kind: "group" | "zone"; id: string } | null>(null);
+  const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
+  const dragDelta = useRef(new Animated.ValueXY()).current;
+  const grantRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const framesRef = useRef<DragFrames | null>(null);
+  const colRefs = useRef<Record<string, Measurable>>({});
+  const zoneRefs = useRef<Record<string, Measurable>>({});
 
   const query = useQuery({
     queryKey: ["aces-boards", "board", selectedBoardId],
@@ -145,10 +206,12 @@ export function BoardScreen({ theme, layout, navigation }: PluginScreenProps) {
         search: { flex: 1, color: c.foreground, backgroundColor: c.surface0, borderWidth: 1, borderColor: c.border, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 6, fontSize: 13 },
         dots: { color: c.foreground, fontSize: 18, paddingHorizontal: 6, paddingVertical: 2 },
         col: { width: 260, marginRight: 12, backgroundColor: c.surface1, borderRadius: 10, borderWidth: 1, borderColor: c.border },
-        colTitle: { color: c.foreground, fontWeight: "600", padding: 10, borderBottomWidth: 1, borderBottomColor: c.border },
-        zoneRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingLeft: 10, paddingRight: 4, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: c.border },
-        zoneTitle: { color: c.foregroundMuted, fontSize: 12, textTransform: "uppercase" as const, letterSpacing: 0.4 },
-        zoneSection: { backgroundColor: c.surface1, borderRadius: 10, borderWidth: 1, borderColor: c.border, marginBottom: 12 },
+        colStrip: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingLeft: 6, paddingRight: 6, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: c.border },
+        dragSurface: { flex: 1, flexDirection: "row", alignItems: "center", alignSelf: "stretch" },
+        colGroup: { backgroundColor: c.surface1, borderRadius: 10, borderWidth: 1, borderColor: c.border, marginBottom: 12 },
+        grip: { color: c.foregroundMuted, fontSize: 16, paddingHorizontal: 6, paddingVertical: 2 },
+        zoneRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingLeft: 4, paddingRight: 4, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: c.border },
+        zoneTitle: { color: c.foregroundMuted, fontSize: 12, textTransform: "uppercase" as const, letterSpacing: 0.4, flex: 1, paddingLeft: 4 },
         cards: { padding: 8, gap: 8 },
         hint: { color: c.foregroundMuted, fontSize: 12, padding: 8 },
         addZoneBtn: { padding: 10, borderRadius: 8, borderWidth: 1, borderColor: c.border, borderStyle: "dashed" as const, alignItems: "center" as const, marginTop: 4 },
@@ -188,10 +251,10 @@ export function BoardScreen({ theme, layout, navigation }: PluginScreenProps) {
     setOverlay(null);
   }
 
-  async function doAddZone() {
+  async function doAddZone(groupId?: string) {
     if (!boardId) return;
     try {
-      await addZone({ boardId });
+      await addZone({ boardId, groupId });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : String(err));
       return;
@@ -319,6 +382,7 @@ export function BoardScreen({ theme, layout, navigation }: PluginScreenProps) {
       [
         { label: "Settings", onPress: () => { setMenu(null); setOverlay({ kind: "zone-settings", zone }); } },
         { label: "Add card", onPress: () => { setMenu(null); setOverlay({ kind: "create-find-card", zone }); } },
+        { label: "Move zone…", onPress: () => { setMenu(null); setOverlay({ kind: "move-zone", zone }); } },
         {
           label: "Delete",
           danger: true,
@@ -334,6 +398,168 @@ export function BoardScreen({ theme, layout, navigation }: PluginScreenProps) {
       event.nativeEvent.pageX,
       event.nativeEvent.pageY,
     );
+  }
+
+  function openGroupMenu(event: { nativeEvent: { pageX: number; pageY: number } }, group: BoardGroup) {
+    const index = groups.findIndex((c) => c.id === group.id);
+    const items: MenuItem[] = [
+      { label: "Add zone", onPress: () => { setMenu(null); void doAddZone(group.id); } },
+    ];
+    if (index > 0) {
+      items.push({
+        label: compact ? "Move up" : "Move left",
+        onPress: () => {
+          setMenu(null);
+          void moveGroupBy(index, index - 1);
+        },
+      });
+    }
+    if (index < groups.length - 1) {
+      items.push({
+        label: compact ? "Move down" : "Move right",
+        onPress: () => {
+          setMenu(null);
+          void moveGroupBy(index, index + 1);
+        },
+      });
+    }
+    placeMenu(items, event.nativeEvent.pageX, event.nativeEvent.pageY);
+  }
+
+  async function moveGroupBy(fromIndex: number, toIndex: number) {
+    if (!boardId) return;
+    const group = groups[fromIndex];
+    if (!group) return;
+    try {
+      await moveGroup({ boardId, groupId: group.id, index: toIndex });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : String(err));
+      return;
+    }
+    invalidate();
+  }
+
+  async function handleMoveZone(zone: Zone, groupId: string, index: number) {
+    if (!boardId) return;
+    try {
+      await moveZone({ boardId, zoneId: zone.id, groupId, index });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : String(err));
+      return;
+    }
+    invalidate();
+    setOverlay(null);
+  }
+
+  function beginDrag(kind: "group" | "zone", id: string, pageX: number, pageY: number) {
+    grantRef.current = { x: pageX, y: pageY };
+    dragDelta.setValue({ x: 0, y: 0 });
+    setDrag({ kind, id });
+    setDropTarget(null);
+    void measureDragFrames().then((frames) => {
+      framesRef.current = frames;
+    });
+  }
+
+  async function measureDragFrames(): Promise<DragFrames> {
+    const rootFrame = rootRef.current ? await measureInWindow(rootRef.current) : null;
+    const cols: Record<string, Frame> = {};
+    const zones: Record<string, Frame> = {};
+    await Promise.all([
+      ...Object.entries(colRefs.current).map(async ([id, ref]) => {
+        const f = await measureInWindow(ref);
+        if (f) cols[id] = f;
+      }),
+      ...Object.entries(zoneRefs.current).map(async ([id, ref]) => {
+        const f = await measureInWindow(ref);
+        if (f) zones[id] = f;
+      }),
+    ]);
+    return { rootX: rootFrame?.x ?? 0, rootY: rootFrame?.y ?? 0, groups: cols, zones };
+  }
+
+  function computeGroupTarget(pageX: number): number {
+    const fr = framesRef.current;
+    if (!fr || !drag) return -1;
+    const remaining = groups.filter((c) => c.id !== drag.id);
+    let index = 0;
+    for (const c of remaining) {
+      const f = fr.groups[c.id];
+      if (f && pageX > f.x + f.w / 2) index++;
+    }
+    return index;
+  }
+
+  function computeZoneTarget(pageX: number, pageY: number): { groupId: string; index: number } | null {
+    const fr = framesRef.current;
+    if (!fr || !drag) return null;
+    let target: BoardGroup | undefined;
+    let best = Infinity;
+    for (const c of groups) {
+      const f = fr.groups[c.id];
+      if (!f) continue;
+      const d = Math.abs(pageX - (f.x + f.w / 2));
+      if (d < best) {
+        best = d;
+        target = c;
+      }
+    }
+    if (!target) return null;
+    const remaining = target.zones.filter((z) => z.id !== drag.id);
+    let index = 0;
+    for (const z of remaining) {
+      const f = fr.zones[z.id];
+      if (f && pageY > f.y + f.h / 2) index++;
+    }
+    return { groupId: target.id, index };
+  }
+
+  function moveDrag(pageX: number, pageY: number) {
+    if (!drag) return;
+    const g = grantRef.current;
+    dragDelta.setValue({ x: pageX - g.x, y: pageY - g.y });
+    if (drag.kind === "group") {
+      const index = computeGroupTarget(pageX);
+      if (index >= 0) setDropTarget({ kind: "group", index });
+    } else {
+      const t = computeZoneTarget(pageX, pageY);
+      if (t) setDropTarget({ kind: "zone", groupId: t.groupId, index: t.index });
+    }
+  }
+
+  function endDrag(pageX: number, pageY: number) {
+    if (!drag || !boardId) {
+      setDrag(null);
+      setDropTarget(null);
+      return;
+    }
+    if (drag.kind === "group") {
+      const index = computeGroupTarget(pageX);
+      if (index >= 0) {
+        void moveGroup({ boardId, groupId: drag.id, index })
+          .then(() => invalidate())
+          .catch((err) => toast.error(err instanceof Error ? err.message : String(err)));
+      }
+    } else {
+      const t = computeZoneTarget(pageX, pageY);
+      if (t) {
+        void moveZone({ boardId, zoneId: drag.id, groupId: t.groupId, index: t.index })
+          .then(() => invalidate())
+          .catch((err) => toast.error(err instanceof Error ? err.message : String(err)));
+      }
+    }
+    setDrag(null);
+    setDropTarget(null);
+  }
+
+  function dragTransform(id: string, kind: "group" | "zone") {
+    if (!drag || drag.id !== id) return undefined;
+    return {
+      transform: kind === "group" ? [{ translateX: dragDelta.x }] : [{ translateX: dragDelta.x }, { translateY: dragDelta.y }],
+      opacity: 0.5,
+      zIndex: 10,
+      elevation: 5,
+    };
   }
 
   function toggleCard(id: string) {
@@ -353,9 +579,22 @@ export function BoardScreen({ theme, layout, navigation }: PluginScreenProps) {
   function renderZone(zone: Zone) {
     const cards = visibleWorkspaces.filter((ws) => ws.zoneId === zone.id);
     return (
-      <View key={zone.id}>
+      <Animated.View
+        key={zone.id}
+        ref={(r) => {
+          zoneRefs.current[zone.id] = r as Measurable | null;
+        }}
+        style={dragTransform(zone.id, "zone")}
+      >
         <View style={styles.zoneRow}>
-          <Text style={styles.zoneTitle}>{zone.title}</Text>
+          {!compact ? (
+            <DragSurface onGrant={(x, y) => beginDrag("zone", zone.id, x, y)} onMove={moveDrag} onRelease={endDrag} style={styles.dragSurface}>
+              <Text style={styles.grip}>≡</Text>
+              <Text style={styles.zoneTitle} selectable={false}>{zone.title}</Text>
+            </DragSurface>
+          ) : (
+            <Text style={styles.zoneTitle} selectable={false}>{zone.title}</Text>
+          )}
           <Pressable accessibilityRole="button" accessibilityLabel={`${zone.title} menu`} onPress={(e) => openZoneMenu(e, zone)}>
             <Text style={styles.dots}>⋯</Text>
           </Pressable>
@@ -385,14 +624,19 @@ export function BoardScreen({ theme, layout, navigation }: PluginScreenProps) {
             ))
           )}
         </View>
-      </View>
+      </Animated.View>
     );
   }
 
-  const columns = board?.columns ?? [];
+  const groups = board?.groups ?? [];
+  const indicatorRect = drag && dropTarget && board && framesRef.current ? computeIndicatorRect(board, drag.id, dropTarget, framesRef.current) : null;
 
   return (
-    <View ref={rootRef} style={styles.root}>
+    <View
+      ref={rootRef}
+      style={styles.root}
+      onLayout={(e) => setRootSize({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}
+    >
       <View style={styles.banner}>
         <Pressable accessibilityRole="button" accessibilityLabel="Switch board" onPress={(e) => openBoardSelector(e)} style={styles.selector}>
           <Text style={styles.selectorText}>Board: {board?.name ?? "…"}</Text>
@@ -431,30 +675,55 @@ export function BoardScreen({ theme, layout, navigation }: PluginScreenProps) {
 
       {compact ? (
         <ScrollView contentContainerStyle={{ padding: 12 }}>
-          {columns.flatMap((column) => column.zones.map((zone) => (
-            <View key={zone.id} style={styles.zoneSection}>
-              {renderZone(zone)}
+          {groups.map((group) => (
+            <View key={group.id} style={styles.colGroup}>
+              <View style={[styles.colStrip, { justifyContent: "flex-end" }]}>
+                <Pressable accessibilityRole="button" accessibilityLabel="Group options" onPress={(e) => openGroupMenu(e, group)}>
+                  <Text style={styles.dots}>⋯</Text>
+                </Pressable>
+              </View>
+              {group.zones.map((zone) => renderZone(zone))}
             </View>
-          )))}
+          ))}
           <Pressable accessibilityRole="button" onPress={() => void doAddZone()} style={styles.addZoneBtn}>
-            <Text style={styles.addZoneText}>+ Add zone</Text>
+            <Text style={styles.addZoneText}>+ Add Zone in new Group</Text>
           </Pressable>
         </ScrollView>
       ) : (
-        <ScrollView horizontal contentContainerStyle={{ padding: 12 }}>
-          {columns.map((column) => (
-            <View key={column.id} style={styles.col}>
-              <Text style={styles.colTitle}>{column.title}</Text>
-              {column.zones.map((zone) => renderZone(zone))}
-            </View>
+        <ScrollView horizontal scrollEnabled={!drag} contentContainerStyle={{ padding: 12 }}>
+          {groups.map((group) => (
+            <Animated.View
+              key={group.id}
+              ref={(r) => {
+                colRefs.current[group.id] = r as Measurable | null;
+              }}
+              style={[styles.col, dragTransform(group.id, "group")]}
+            >
+              <View style={styles.colStrip}>
+                <DragSurface onGrant={(x, y) => beginDrag("group", group.id, x, y)} onMove={moveDrag} onRelease={endDrag} style={styles.dragSurface}>
+                  <Text style={styles.grip}>≡</Text>
+                </DragSurface>
+                <Pressable accessibilityRole="button" accessibilityLabel="Group options" onPress={(e) => openGroupMenu(e, group)}>
+                  <Text style={styles.dots}>⋯</Text>
+                </Pressable>
+              </View>
+              {group.zones.map((zone) => renderZone(zone))}
+              <Pressable accessibilityRole="button" onPress={() => void doAddZone(group.id)} style={styles.addZoneBtn}>
+                <Text style={styles.addZoneText}>+ Add zone</Text>
+              </Pressable>
+            </Animated.View>
           ))}
           <Pressable accessibilityRole="button" onPress={() => void doAddZone()} style={[styles.addZoneBtn, { width: 160, alignSelf: "flex-start" }]}>
-            <Text style={styles.addZoneText}>+ Add zone</Text>
+            <Text style={styles.addZoneText}>+ Add Zone in new Group</Text>
           </Pressable>
         </ScrollView>
       )}
 
-      {menu ? <ContextMenu menu={menu} theme={theme} onClose={() => setMenu(null)} /> : null}
+      {indicatorRect ? (
+        <View pointerEvents="none" style={{ position: "absolute", left: indicatorRect.left, top: indicatorRect.top, width: indicatorRect.width, height: indicatorRect.height, backgroundColor: c.accent, borderRadius: 2, opacity: 0.9 }} />
+      ) : null}
+
+      {menu ? <ContextMenu menu={menu} theme={theme} onClose={() => setMenu(null)} containerWidth={rootSize.width} containerHeight={rootSize.height} /> : null}
 
       {overlay ? (
         <OverlayView
@@ -482,6 +751,7 @@ export function BoardScreen({ theme, layout, navigation }: PluginScreenProps) {
           }}
           onCreateCard={handleCreateCard}
           onAdopt={handleAdopt}
+          onMoveZone={handleMoveZone}
           onCreatedBoard={handleCreateBoard}
           onRenameBoard={handleRenameBoard}
           onSaveDefaults={handleSetDefaults}
@@ -491,15 +761,34 @@ export function BoardScreen({ theme, layout, navigation }: PluginScreenProps) {
   );
 }
 
-function ContextMenu({ menu, theme, onClose }: { menu: MenuState; theme: PluginTheme; onClose: () => void }) {
+function ContextMenu({
+  menu,
+  theme,
+  onClose,
+  containerWidth,
+  containerHeight,
+}: {
+  menu: MenuState;
+  theme: PluginTheme;
+  onClose: () => void;
+  containerWidth: number;
+  containerHeight: number;
+}) {
   const c = theme.colors;
-  const width = Dimensions.get("window").width;
+  const width = containerWidth || Dimensions.get("window").width;
+  const height = containerHeight || Dimensions.get("window").height;
   const menuWidth = 180;
+  const itemHeight = 40;
+  const menuHeight = menu.items.length * itemHeight + 2;
   const left = Math.max(8, Math.min(menu.x - menuWidth + 8, width - menuWidth - 8));
+  let top = menu.y + 4;
+  if (top + menuHeight > height - 8) {
+    top = Math.max(8, menu.y - menuHeight - 4);
+  }
   return (
     <>
       <Pressable accessibilityRole="button" onPress={onClose} style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }} />
-      <View style={{ position: "absolute", top: menu.y + 4, left, width: menuWidth, backgroundColor: c.surface1, borderRadius: 8, borderWidth: 1, borderColor: c.border }}>
+      <View style={{ position: "absolute", top, left, width: menuWidth, backgroundColor: c.surface1, borderRadius: 8, borderWidth: 1, borderColor: c.border }}>
         {menu.items.map((item) => (
           <Pressable key={item.label} accessibilityRole="button" onPress={item.onPress} style={{ paddingHorizontal: 12, paddingVertical: 10, flexDirection: "row", gap: 6 }}>
             <Text style={{ color: item.danger ? c.statusDanger : c.foreground, fontSize: 14 }}>{item.checked ? "✓ " : ""}{item.label}</Text>
@@ -655,6 +944,7 @@ function OverlayView({
   onPickZone,
   onCreateCard,
   onAdopt,
+  onMoveZone,
   onCreatedBoard,
   onRenameBoard,
   onSaveDefaults,
@@ -670,6 +960,7 @@ function OverlayView({
   onPickZone: (card: WorkspaceCard, zone: Zone) => void;
   onCreateCard: (input: CreateCardInput) => void;
   onAdopt: (zone: Zone, workspaceId: string) => void;
+  onMoveZone: (zone: Zone, groupId: string, index: number) => void;
   onCreatedBoard: (name: string) => void;
   onRenameBoard: (name: string) => void;
   onSaveDefaults: (cardDefaults: CardDefaults) => void;
@@ -678,7 +969,7 @@ function OverlayView({
     case "zone-settings":
       return <ZoneSettingsModal theme={theme} zone={overlay.zone} onClose={onClose} onSave={onSaveZone} />;
     case "move":
-      return <MoveModal theme={theme} card={overlay.card} columns={board?.columns ?? []} onClose={onClose} onPickZone={onPickZone} />;
+      return <MoveModal theme={theme} card={overlay.card} groups={board?.groups ?? []} onClose={onClose} onPickZone={onPickZone} />;
     case "pick-session":
       return <PickSessionModal theme={theme} card={overlay.card} zone={overlay.zone} onClose={onClose} onMove={onMove} />;
     case "create-find-card":
@@ -694,6 +985,8 @@ function OverlayView({
           onAdopt={(workspaceId) => onAdopt(overlay.zone, workspaceId)}
         />
       );
+    case "move-zone":
+      return <MoveZoneModal theme={theme} zone={overlay.zone} board={board} onClose={onClose} onMove={(groupId, index) => onMoveZone(overlay.zone, groupId, index)} />;
     case "new-board":
       return <NewBoardModal theme={theme} onClose={onClose} onCreated={onCreatedBoard} />;
     case "rename-board":
@@ -767,13 +1060,13 @@ function ZoneSettingsModal({
 function MoveModal({
   theme,
   card,
-  columns,
+  groups,
   onClose,
   onPickZone,
 }: {
   theme: PluginTheme;
   card: WorkspaceCard;
-  columns: Board["columns"];
+  groups: Board["groups"];
   onClose: () => void;
   onPickZone: (card: WorkspaceCard, zone: Zone) => void;
 }) {
@@ -782,10 +1075,10 @@ function MoveModal({
     <Modal title={`Move "${card.name}"`} open onOpenChange={(o) => { if (!o) onClose(); }}>
       <Modal.Content scrollable={false} contentContainerStyle={{ gap: 12 }}>
         <HostScrollView style={{ maxHeight: 320 }}>
-          {columns.map((column) =>
-            column.zones.map((zone) => (
+          {groups.map((group, ci) =>
+            group.zones.map((zone) => (
               <Pressable key={zone.id} accessibilityRole="button" onPress={() => onPickZone(card, zone)} style={{ padding: 10, borderRadius: 8, backgroundColor: c.border, marginBottom: 6 }}>
-                <Text style={{ color: c.foreground }}>{column.title} / {zone.title}</Text>
+                <Text style={{ color: c.foreground }}>Group {ci + 1} / {zone.title}</Text>
               </Pressable>
             )),
           )}
@@ -821,6 +1114,51 @@ function PickSessionModal({
               <Text style={{ color: c.foreground }}>{session.title}</Text>
               <Text style={{ color: c.foregroundMuted, fontSize: 11 }}>{session.status}</Text>
             </Pressable>
+          ))}
+        </HostScrollView>
+        <Pressable accessibilityRole="button" onPress={onClose} style={btn(c)}>
+          <Text style={{ color: c.foreground }}>Cancel</Text>
+        </Pressable>
+      </Modal.Content>
+    </Modal>
+  );
+}
+
+function MoveZoneModal({
+  theme,
+  zone,
+  board,
+  onClose,
+  onMove,
+}: {
+  theme: PluginTheme;
+  zone: Zone;
+  board?: Board;
+  onClose: () => void;
+  onMove: (groupId: string, index: number) => void;
+}) {
+  const c = theme.colors;
+  const groups = board?.groups ?? [];
+  return (
+    <Modal title={`Move "${zone.title}"`} open onOpenChange={(o) => { if (!o) onClose(); }}>
+      <Modal.Content scrollable={false} contentContainerStyle={{ gap: 12 }}>
+        <HostScrollView style={{ maxHeight: 320 }}>
+          {groups.map((group, ci) => (
+            <View key={group.id} style={{ marginBottom: 8 }}>
+              <Text style={{ color: c.foregroundMuted, fontSize: 11, textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 4 }}>
+                Group {ci + 1}
+              </Text>
+              <Pressable accessibilityRole="button" onPress={() => onMove(group.id, 0)} style={{ padding: 10, borderRadius: 8, backgroundColor: c.border, marginBottom: 4 }}>
+                <Text style={{ color: c.foreground }}>Top of group</Text>
+              </Pressable>
+              {group.zones
+                .filter((z) => z.id !== zone.id)
+                .map((z, zi) => (
+                  <Pressable key={z.id} accessibilityRole="button" onPress={() => onMove(group.id, zi + 1)} style={{ padding: 10, borderRadius: 8, backgroundColor: c.border, marginBottom: 4 }}>
+                    <Text style={{ color: c.foreground }}>After {z.title}</Text>
+                  </Pressable>
+                ))}
+            </View>
           ))}
         </HostScrollView>
         <Pressable accessibilityRole="button" onPress={onClose} style={btn(c)}>

@@ -2,9 +2,12 @@
 
 ## Shipped
 
-- **Board** — zones (columns) holding Paseo workspaces as cards; each card shows
+- **Board** — zones (groups) holding Paseo workspaces as cards; each card shows
   branch, PR pill, issue pills, and a session tree (with sub-agents). Drop a card
   into a zone to run that zone's prompt (or use a zone as a status flag).
+- **Stacked zones + reorder** — groups are nameless containers that stack multiple
+  zones; a per-group "+ Add zone" appends a zone. Groups and zones reorder by
+  dragging their header grip (desktop) or via the `⋯` menus (everywhere).
 - **Multiple boards + card defaults** — board selector, per-board card defaults,
   Create card (worktree/directory, slugified branch, optional initial agent) and
   Find card (adopt unassigned workspaces).

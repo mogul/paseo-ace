@@ -9,7 +9,7 @@ const DEFAULT_BOARDS: BoardsData = {
     {
       id: "main",
       name: "Main",
-      columns: [
+      groups: [
         { id: "backlog", title: "Backlog", zones: [{ id: "backlog-1", title: "Backlog" }] },
         {
           id: "review",
@@ -127,7 +127,7 @@ export class BoardStore {
     const board: Board = {
       id: "board-" + randomUUID().slice(0, 8),
       name,
-      columns: [
+      groups: [
         {
           id: "col-" + randomUUID().slice(0, 8),
           title: "New zone",

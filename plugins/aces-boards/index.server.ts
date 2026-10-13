@@ -7,7 +7,9 @@ import {
   boardCreateRpc,
   boardDeleteRpc,
   boardDeleteZoneRpc,
+  boardMoveGroupRpc,
   boardMoveRpc,
+  boardMoveZoneRpc,
   boardNewSessionRpc,
   boardProjectsRpc,
   boardRenameRpc,
@@ -123,8 +125,18 @@ export default function contribute(server: PluginServerContext) {
     return { workspaces: await buildAllWorkspaceCards(paseo) };
   });
 
-  server.handle(boardAddZoneRpc, ({ boardId }) => {
-    engine.addZone(boardId);
+  server.handle(boardAddZoneRpc, ({ boardId, groupId }) => {
+    engine.addZone(boardId, groupId);
+    return { ok: true };
+  });
+
+  server.handle(boardMoveGroupRpc, ({ boardId, groupId, index }) => {
+    engine.moveGroup(boardId, groupId, index);
+    return { ok: true };
+  });
+
+  server.handle(boardMoveZoneRpc, ({ boardId, zoneId, groupId, index }) => {
+    engine.moveZone(boardId, zoneId, groupId, index);
     return { ok: true };
   });
 

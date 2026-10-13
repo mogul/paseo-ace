@@ -18,7 +18,7 @@ interface JsonRpcRequest {
 const TOOLS = [
   {
     name: "board_list",
-    description: "List the board columns, zones, and workspace cards.",
+    description: "List the board groups, zones, and workspace cards.",
     inputSchema: { type: "object", properties: {} },
   },
   {

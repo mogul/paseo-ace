@@ -16,13 +16,13 @@ export const ZoneSchema = z.object({
 });
 export type Zone = z.infer<typeof ZoneSchema>;
 
-export const ColumnSchema = z.object({
+export const GroupSchema = z.object({
   id: z.string().min(1),
   title: z.string().min(1),
   width: z.number().positive().optional(),
   zones: z.array(ZoneSchema).min(1),
 });
-export type BoardColumn = z.infer<typeof ColumnSchema>;
+export type BoardGroup = z.infer<typeof GroupSchema>;
 
 export const CardDefaultsSchema = z.object({
   isolation: z.enum(["worktree", "directory"]).default("worktree"),
@@ -38,7 +38,7 @@ export type CardDefaults = z.infer<typeof CardDefaultsSchema>;
 export const BoardSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
-  columns: z.array(ColumnSchema),
+  groups: z.array(GroupSchema),
   placement: z.record(z.string(), z.string()).optional(),
   cardDefaults: CardDefaultsSchema.optional(),
 });
@@ -168,7 +168,19 @@ export const boardWorkspacesRpc = defineRpc({
 
 export const boardAddZoneRpc = defineRpc({
   name: "board.add-zone",
-  input: z.object({ boardId: z.string().min(1) }).strict(),
+  input: z.object({ boardId: z.string().min(1), groupId: z.string().min(1).optional() }).strict(),
+  output: z.object({ ok: z.boolean() }),
+});
+
+export const boardMoveGroupRpc = defineRpc({
+  name: "board.move-group",
+  input: z.object({ boardId: z.string().min(1), groupId: z.string().min(1), index: z.number().int().min(0) }).strict(),
+  output: z.object({ ok: z.boolean() }),
+});
+
+export const boardMoveZoneRpc = defineRpc({
+  name: "board.move-zone",
+  input: z.object({ boardId: z.string().min(1), zoneId: z.string().min(1), groupId: z.string().min(1), index: z.number().int().min(0) }).strict(),
   output: z.object({ ok: z.boolean() }),
 });
 

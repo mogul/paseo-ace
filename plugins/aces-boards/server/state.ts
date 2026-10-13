@@ -79,7 +79,7 @@ export async function buildAllWorkspaceCards(paseo: PaseoApi): Promise<Workspace
 export async function buildWorkspaceCards(paseo: PaseoApi, board: Board): Promise<WorkspaceCard[]> {
   const cards = await collectWorkspaceCards(paseo);
   const placement = board.placement ?? {};
-  const defaultZoneId = board.columns[0]?.zones[0]?.id ?? "";
+  const defaultZoneId = board.groups[0]?.zones[0]?.id ?? "";
 
   return cards
     .filter((card) => card.id === UNASSIGNED_CARD_ID || Object.prototype.hasOwnProperty.call(placement, card.id))

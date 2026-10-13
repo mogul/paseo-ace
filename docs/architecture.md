@@ -31,12 +31,12 @@ droppable regions (arranged in columns). Agor's "Cards (beta)" is unrelated.
 
 ```json
 {
-  "boards": [ { "id", "name", "columns": [...], "placement": {...}, "cardDefaults": CardDefaults } ],
+  "boards": [ { "id", "name", "groups": [...], "placement": {...}, "cardDefaults": CardDefaults } ],
   "lastVisitedBoardId": "..."
 }
 ```
 
-- `columns`: `[{ id, title, width?, zones: [{ id, title, trigger? }] }]`.
+- `groups`: `[{ id, title, width?, zones: [{ id, title, trigger? }] }]`.
 - `placement`: `{ workspaceId: zoneId }`. **This is membership** — a workspace
   is on a board iff its id is in that board's `placement`; unassigned workspaces
   appear only in the "Find card" picker. Workspaces never leak across boards.
