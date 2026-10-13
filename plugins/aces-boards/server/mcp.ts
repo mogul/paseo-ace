@@ -9,6 +9,11 @@ export interface McpHandlers {
   listBoards: () => BoardSummary[];
   moveCard: (workspaceId: string, zoneId: string, boardId?: string) => Promise<{ ok: boolean; error?: string }>;
   createCard: (input: { zoneId: string; name: string; projectCwd: string; boardId?: string; prompt?: string }) => Promise<{ ok: boolean; workspaceId?: string; error?: string }>;
+  addZone: (groupId: string | undefined, title: string | undefined, boardId: string | undefined) => { ok: boolean; error?: string };
+  renameZone: (zoneId: string, title: string, boardId: string | undefined) => { ok: boolean; error?: string };
+  deleteZone: (zoneId: string, boardId: string | undefined) => { ok: boolean; error?: string };
+  moveZone: (zoneId: string, groupId: string, index: number, boardId: string | undefined) => { ok: boolean; error?: string };
+  moveGroup: (groupId: string, index: number, boardId: string | undefined) => { ok: boolean; error?: string };
   buildWorkspaces: () => Promise<WorkspaceCard[]>;
 }
 
@@ -47,6 +52,50 @@ const TOOLS = [
         prompt: { type: "string" },
       },
       required: ["zoneId", "name", "projectCwd"],
+    },
+  },
+  {
+    name: "board_add_zone",
+    description: "Add a zone. If groupId is given the zone is appended to that group; otherwise a new group containing the zone is created.",
+    inputSchema: {
+      type: "object",
+      properties: { boardId: { type: "string" }, groupId: { type: "string" }, title: { type: "string" } },
+    },
+  },
+  {
+    name: "board_rename_zone",
+    description: "Rename a zone.",
+    inputSchema: {
+      type: "object",
+      properties: { boardId: { type: "string" }, zoneId: { type: "string" }, title: { type: "string" } },
+      required: ["zoneId", "title"],
+    },
+  },
+  {
+    name: "board_delete_zone",
+    description: "Delete a zone.",
+    inputSchema: {
+      type: "object",
+      properties: { boardId: { type: "string" }, zoneId: { type: "string" } },
+      required: ["zoneId"],
+    },
+  },
+  {
+    name: "board_move_zone",
+    description: "Move a zone into a group at a 0-based position.",
+    inputSchema: {
+      type: "object",
+      properties: { boardId: { type: "string" }, zoneId: { type: "string" }, groupId: { type: "string" }, index: { type: "number" } },
+      required: ["zoneId", "groupId", "index"],
+    },
+  },
+  {
+    name: "board_move_group",
+    description: "Reorder a group (column) to a 0-based position.",
+    inputSchema: {
+      type: "object",
+      properties: { boardId: { type: "string" }, groupId: { type: "string" }, index: { type: "number" } },
+      required: ["groupId", "index"],
     },
   },
 ];
@@ -227,6 +276,82 @@ export class McpServer {
       try {
         const result = await handlers.createCard({ zoneId, name, projectCwd, boardId, prompt });
         this.toolResult(res, id, result);
+      } catch (error) {
+        this.toolError(res, id, error);
+      }
+      return;
+    }
+
+    if (name === "board_add_zone") {
+      const groupId = typeof args.groupId === "string" ? args.groupId : undefined;
+      const title = typeof args.title === "string" ? args.title : undefined;
+      const boardId = typeof args.boardId === "string" ? args.boardId : undefined;
+      try {
+        this.toolResult(res, id, handlers.addZone(groupId, title, boardId));
+      } catch (error) {
+        this.toolError(res, id, error);
+      }
+      return;
+    }
+
+    if (name === "board_rename_zone") {
+      const zoneId = args.zoneId;
+      const title = args.title;
+      const boardId = typeof args.boardId === "string" ? args.boardId : undefined;
+      if (typeof zoneId !== "string" || typeof title !== "string") {
+        this.toolError(res, id, new Error("zoneId and title are required string arguments."));
+        return;
+      }
+      try {
+        this.toolResult(res, id, handlers.renameZone(zoneId, title, boardId));
+      } catch (error) {
+        this.toolError(res, id, error);
+      }
+      return;
+    }
+
+    if (name === "board_delete_zone") {
+      const zoneId = args.zoneId;
+      const boardId = typeof args.boardId === "string" ? args.boardId : undefined;
+      if (typeof zoneId !== "string") {
+        this.toolError(res, id, new Error("zoneId is a required string argument."));
+        return;
+      }
+      try {
+        this.toolResult(res, id, handlers.deleteZone(zoneId, boardId));
+      } catch (error) {
+        this.toolError(res, id, error);
+      }
+      return;
+    }
+
+    if (name === "board_move_zone") {
+      const zoneId = args.zoneId;
+      const groupId = args.groupId;
+      const index = args.index;
+      const boardId = typeof args.boardId === "string" ? args.boardId : undefined;
+      if (typeof zoneId !== "string" || typeof groupId !== "string" || typeof index !== "number") {
+        this.toolError(res, id, new Error("zoneId (string), groupId (string), and index (number) are required."));
+        return;
+      }
+      try {
+        this.toolResult(res, id, handlers.moveZone(zoneId, groupId, index, boardId));
+      } catch (error) {
+        this.toolError(res, id, error);
+      }
+      return;
+    }
+
+    if (name === "board_move_group") {
+      const groupId = args.groupId;
+      const index = args.index;
+      const boardId = typeof args.boardId === "string" ? args.boardId : undefined;
+      if (typeof groupId !== "string" || typeof index !== "number") {
+        this.toolError(res, id, new Error("groupId (string) and index (number) are required."));
+        return;
+      }
+      try {
+        this.toolResult(res, id, handlers.moveGroup(groupId, index, boardId));
       } catch (error) {
         this.toolError(res, id, error);
       }

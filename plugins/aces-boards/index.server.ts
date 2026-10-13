@@ -56,6 +56,46 @@ export default function contribute(server: PluginServerContext) {
         return { ok: false, error: error instanceof Error ? error.message : String(error) };
       }
     },
+    addZone: (groupId, title, boardId) => {
+      try {
+        engine.addZone(boardId ?? store.current().id, groupId, title);
+        return { ok: true };
+      } catch (error) {
+        return { ok: false, error: error instanceof Error ? error.message : String(error) };
+      }
+    },
+    renameZone: (zoneId, title, boardId) => {
+      try {
+        engine.updateZone(boardId ?? store.current().id, zoneId, { title });
+        return { ok: true };
+      } catch (error) {
+        return { ok: false, error: error instanceof Error ? error.message : String(error) };
+      }
+    },
+    deleteZone: (zoneId, boardId) => {
+      try {
+        engine.deleteZone(boardId ?? store.current().id, zoneId);
+        return { ok: true };
+      } catch (error) {
+        return { ok: false, error: error instanceof Error ? error.message : String(error) };
+      }
+    },
+    moveZone: (zoneId, groupId, index, boardId) => {
+      try {
+        engine.moveZone(boardId ?? store.current().id, zoneId, groupId, index);
+        return { ok: true };
+      } catch (error) {
+        return { ok: false, error: error instanceof Error ? error.message : String(error) };
+      }
+    },
+    moveGroup: (groupId, index, boardId) => {
+      try {
+        engine.moveGroup(boardId ?? store.current().id, groupId, index);
+        return { ok: true };
+      } catch (error) {
+        return { ok: false, error: error instanceof Error ? error.message : String(error) };
+      }
+    },
     buildWorkspaces: async () => {
       if (!paseoApi) throw new Error("Paseo API is not available yet.");
       return buildWorkspaceCards(paseoApi, store.current());
@@ -164,8 +204,8 @@ export default function contribute(server: PluginServerContext) {
     return { workspaces: await buildAllWorkspaceCards(paseo) };
   });
 
-  server.handle(boardAddZoneRpc, ({ boardId, groupId }) => {
-    engine.addZone(boardId, groupId);
+  server.handle(boardAddZoneRpc, ({ boardId, groupId, title }) => {
+    engine.addZone(boardId, groupId, title);
     return { ok: true };
   });
 

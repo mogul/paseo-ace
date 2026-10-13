@@ -169,7 +169,7 @@ export const boardWorkspacesRpc = defineRpc({
 
 export const boardAddZoneRpc = defineRpc({
   name: "board.add-zone",
-  input: z.object({ boardId: z.string().min(1), groupId: z.string().min(1).optional() }).strict(),
+  input: z.object({ boardId: z.string().min(1), groupId: z.string().min(1).optional(), title: z.string().optional() }).strict(),
   output: z.object({ ok: z.boolean() }),
 });
 

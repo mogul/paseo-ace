@@ -47,20 +47,21 @@ export class BoardEngine {
     this.paseo = paseo;
   }
 
-  addZone(boardId: string, groupId?: string): void {
+  addZone(boardId: string, groupId?: string, title?: string): void {
     const id = "zone-" + randomUUID().slice(0, 8);
+    const zoneTitle = title?.trim() || "New zone";
     if (groupId) {
       const board = this.store.get(boardId);
       if (!board.groups.some((c) => c.id === groupId)) throw new Error(`Group not found: ${groupId}`);
       this.store.update(boardId, (b) => {
         const group = b.groups.find((c) => c.id === groupId);
-        if (group) group.zones.push({ id, title: "New zone" });
+        if (group) group.zones.push({ id, title: zoneTitle });
       });
       return;
     }
     const newGroupId = "col-" + randomUUID().slice(0, 8);
     this.store.update(boardId, (board) => {
-      board.groups.push({ id: newGroupId, title: "New zone", zones: [{ id, title: "New zone" }] });
+      board.groups.push({ id: newGroupId, title: zoneTitle, zones: [{ id, title: zoneTitle }] });
     });
   }
 
