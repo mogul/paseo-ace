@@ -36,9 +36,9 @@ export function frameworkDir(): string {
 export function frameworkBaseBranch(): string {
   try {
     const branch = run("git branch --show-current", frameworkDir()).trim();
-    return branch || "master";
+    return branch || "main";
   } catch {
-    return "master";
+    return "main";
   }
 }
 
@@ -83,9 +83,9 @@ function commitIfChanged(dir: string, message: string): void {
 
 // Rewrites the framework template branches to the current seeds. Persona
 // SOUL/USER/IDENTITY are preserved; only the framework files (AGENTS/BOOT/
-// BOARD/HEARTBEAT) and the blank master identity are refreshed.
+// BOARD/HEARTBEAT) and the blank main identity are refreshed.
 function updateTemplate(dir: string, version: string): void {
-  const base = run("git branch --show-current", dir).trim() || "master";
+  const base = run("git branch --show-current", dir).trim() || "main";
 
   run(`git checkout ${base}`, dir);
   writeFile(dir, "AGENTS.md", AGENTS_SEED);
@@ -113,7 +113,7 @@ function bootstrapRepo(): void {
   if (existsSync(join(dir, ".git"))) return;
 
   mkdirSync(dir, { recursive: true });
-  run("git init", dir);
+  run("git init -b main", dir);
   run("git config user.name aces", dir);
   run("git config user.email aces@localhost", dir);
   run("git config commit.gpgsign false", dir);

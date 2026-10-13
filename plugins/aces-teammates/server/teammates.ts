@@ -107,7 +107,7 @@ Onboarding is complete once a useful working relationship exists. Before deletin
 // A teammate's home holds two classes of files:
 //   - FRAMEWORK files are owned by the template: AGENTS.md (operating manual)
 //     and BOOT.md (startup checklist). They live on the framework repo's
-//     `master`/`template/<persona>` branches and reach a teammate by `git
+//     `main`/`template/<persona>` branches and reach a teammate by `git
 //     rebase` onto its base branch (the "Sync framework" action), never by
 //     overwriting a teammate's working files.
 //   - LEARNED files are owned by the teammate and seeded once at creation:
