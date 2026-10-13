@@ -32,13 +32,13 @@ interface TeammatesData {
   teammates: TeammateRecord[];
 }
 
-const SOUL_SEED = "# Soul\n\n(personality, communication style, principles)";
-const USER_SEED = "# About the user\n\n(preferences, patterns — the teammate fills this in as it learns)";
-const BOARD_SEED = "# Board\n\nDescribe what each zone on this board means and how work moves between zones.";
-const HEARTBEAT_SEED =
+export const SOUL_SEED = "# Soul\n\n(personality, communication style, principles)";
+export const USER_SEED = "# About the user\n\n(preferences, patterns — the teammate fills this in as it learns)";
+export const BOARD_SEED = "# Board\n\nDescribe what each zone on this board means and how work moves between zones.";
+export const HEARTBEAT_SEED =
   "# Heartbeat\n\nOptional periodic tasks: review board state, triage new work, summarize to memory.";
 
-const AGENTS_SEED = `# Agents
+export const AGENTS_SEED = `# Agents
 
 You are an AI teammate living in a Paseo home directory. Your home holds your identity, memory, and operating notes; it is not a code checkout.
 
@@ -66,9 +66,9 @@ You are an AI teammate living in a Paseo home directory. Your home holds your id
 | HEARTBEAT.md | Periodic tasks |
 
 On a fresh session, read and follow BOOT.md.`;
-const BOOT_SEED =
+export const BOOT_SEED =
   "# Boot\n\nAt the start of a fresh session, quietly rebuild context before replying: 1. You are already provided your SOUL.md, IDENTITY.md, and USER.md. 2. In a user-facing session, if ONBOARDING.md is present, follow it and use its current state as context; address the user's request first. 3. Search recent memory for relevant context; read BOARD.md only when the work needs it. Do not narrate this process.";
-const ONBOARDING_SEED = `# Onboarding
+export const ONBOARDING_SEED = `# Onboarding
 
 This file guides your first run and tracks progress. Keep it current; it is a live record, not just instructions.
 
@@ -138,7 +138,7 @@ function isFrameworkOutdated(version: string | undefined): boolean {
   return compareFrameworkVersions(version, FRAMEWORK_VERSION) < 0;
 }
 
-function identitySeed(name: string): string {
+export function identitySeed(name: string): string {
   return `# Identity\n\nName: ${name}\n\n(purpose)`;
 }
 
@@ -154,7 +154,7 @@ function seedFiles(personaId: string | undefined, name: string): { soul: string;
   return { soul: persona.soul, identity: persona.identity, user: persona.user };
 }
 
-function baseDir(): string {
+export function baseDir(): string {
   const base = process.env.PASEO_HOME || join(homedir(), ".paseo");
   return join(base, "aces");
 }

@@ -8,6 +8,7 @@ import {
   teammateRenameRpc,
   teammateStartRpc,
 } from "./shared/contracts";
+import { ensureFrameworkRepo } from "./server/framework";
 import { McpServer } from "./server/mcp";
 import { PresenceTracker } from "./server/presence";
 import { HeartbeatScheduler, buildHeartbeatPrompt } from "./server/scheduler";
@@ -15,6 +16,7 @@ import { buildSystemPrompt, createBoard, readBoards, TeammateStore } from "./ser
 
 export default function contribute(server: PluginServerContext) {
   const store = new TeammateStore();
+  setTimeout(() => ensureFrameworkRepo(), 0);
   const presence = new PresenceTracker();
   let paseoApi: PaseoApi | null = null;
 
