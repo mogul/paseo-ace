@@ -14,6 +14,7 @@ export const TeammateSchema = z.object({
   heartbeatCron: z.string().optional(),
   persona: z.string().optional(),
   frameworkVersion: z.string().optional(),
+  syncConflict: z.boolean().optional(),
   createdAt: z.string(),
   memoryPath: z.string(),
 });
@@ -78,4 +79,10 @@ export const teammateStartRpc = defineRpc({
   name: "teammate.start",
   input: z.object({ id: z.string().min(1), workspaceId: z.string().optional() }).strict(),
   output: z.object({ agentId: z.string() }),
+});
+
+export const teammateSyncFrameworkRpc = defineRpc({
+  name: "teammate.sync-framework",
+  input: z.object({ id: z.string().min(1) }).strict(),
+  output: z.object({ ok: z.boolean(), conflict: z.boolean(), files: z.array(z.string()) }),
 });

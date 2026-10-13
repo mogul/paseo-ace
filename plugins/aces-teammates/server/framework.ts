@@ -48,6 +48,22 @@ export function addTeammateWorktree(slug: string, baseBranch: string): string {
   return home;
 }
 
+export function syncTeammateBranch(slug: string, baseBranch: string): { ok: boolean; conflict: boolean; files: string[] } {
+  const home = join(baseDir(), "teammates", slug);
+  try {
+    run(`git rebase ${baseBranch}`, home);
+    return { ok: true, conflict: false, files: [] };
+  } catch {
+    try {
+      const files = run("git diff --name-only --diff-filter=U", home).trim().split(/\s+/).filter(Boolean);
+      if (files.length > 0) return { ok: false, conflict: true, files };
+    } catch {
+      // fall through
+    }
+    return { ok: false, conflict: false, files: [] };
+  }
+}
+
 function readFrameworkVersion(dir: string): string {
   try {
     return run("git config framework.version", dir).trim();

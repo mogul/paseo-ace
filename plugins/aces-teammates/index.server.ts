@@ -7,6 +7,7 @@ import {
   teammateListRpc,
   teammateRenameRpc,
   teammateStartRpc,
+  teammateSyncFrameworkRpc,
 } from "./shared/contracts";
 import { ensureFrameworkRepo } from "./server/framework";
 import { McpServer } from "./server/mcp";
@@ -99,6 +100,11 @@ export default function contribute(server: PluginServerContext) {
     return { ok: true };
   });
 
+  server.handle(teammateSyncFrameworkRpc, ({ id }, { paseo }) => {
+    capturePaseo(paseo);
+    return store.syncFramework(id);
+  });
+
   server.handle(teammateStartRpc, async ({ id, workspaceId }, { paseo }) => {
     capturePaseo(paseo);
     if (!paseoApi) throw new Error("Paseo API is not available yet.");
@@ -119,6 +125,7 @@ export default function contribute(server: PluginServerContext) {
     }
     presence.markActive(id, agentId);
     store.setLastAgentId(id, agentId);
+    store.clearSyncConflict(id);
     return { agentId };
   });
 

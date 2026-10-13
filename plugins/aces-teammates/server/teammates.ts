@@ -5,7 +5,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import type { BoardSummary, Teammate } from "../shared/contracts";
 import { getPersona } from "../shared/personas";
-import { addTeammateWorktree, frameworkBaseBranch } from "./framework";
+import { addTeammateWorktree, frameworkBaseBranch, syncTeammateBranch } from "./framework";
 
 interface TeammateRecord {
   id: string;
@@ -20,6 +20,7 @@ interface TeammateRecord {
   persona?: string;
   emoji?: string;
   frameworkVersion?: string;
+  syncConflict?: boolean;
   createdAt: string;
 }
 
@@ -387,6 +388,29 @@ export class TeammateStore {
     const record = this.record(id);
     record.lastAgentId = agentId;
     this.persist();
+  }
+
+  syncFramework(id: string): { ok: boolean; conflict: boolean; files: string[] } {
+    const record = this.record(id);
+    const base = record.persona ? `template/${record.persona}` : frameworkBaseBranch();
+    const result = syncTeammateBranch(id, base);
+    if (result.ok) {
+      record.frameworkVersion = FRAMEWORK_VERSION;
+      record.syncConflict = false;
+      this.persist();
+    } else if (result.conflict) {
+      record.syncConflict = true;
+      this.persist();
+    }
+    return result;
+  }
+
+  clearSyncConflict(id: string): void {
+    const record = this.record(id);
+    if (record.syncConflict) {
+      record.syncConflict = false;
+      this.persist();
+    }
   }
 
   delete(id: string): void {

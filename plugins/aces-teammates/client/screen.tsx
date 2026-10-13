@@ -13,6 +13,7 @@ import {
   teammateListRpc,
   teammateRenameRpc,
   teammateStartRpc,
+  teammateSyncFrameworkRpc,
   type BoardSummary,
   type Teammate,
 } from "../shared/contracts";
@@ -63,6 +64,7 @@ export function TeammatesScreen({ theme, layout, navigation }: PluginScreenProps
   const remove = useRpc(teammateDeleteRpc);
   const start = useRpc(teammateStartRpc);
   const boardsRpc = useRpc(teammateBoardsRpc);
+  const syncFramework = useRpc(teammateSyncFrameworkRpc);
 
   const [overlay, setOverlay] = useState<Overlay | null>(null);
   const [menu, setMenu] = useState<MenuState | null>(null);
@@ -182,6 +184,7 @@ export function TeammatesScreen({ theme, layout, navigation }: PluginScreenProps
       [
         { label: "Rename", onPress: () => { setMenu(null); setOverlay({ kind: "rename", teammate }); } },
         { label: "Copy memory path", onPress: () => { setMenu(null); void copyPath(teammate); } },
+        { label: "Sync framework", onPress: () => { setMenu(null); void syncFramework({ id: teammate.id }).then((r) => { if (r.ok) toast.show("Framework synced."); else if (r.conflict) toast.error(`Sync conflict in ${r.files.join(", ") || "files"} — start ${teammate.name} to resolve.`); else toast.error("Sync failed."); invalidate(); }).catch((err) => toast.error(err instanceof Error ? err.message : String(err))); } },
         { label: "Delete", danger: true, onPress: () => { setMenu(null); setOverlay({ kind: "delete", teammate }); } },
       ],
       event.nativeEvent.pageX,
@@ -206,6 +209,7 @@ export function TeammatesScreen({ theme, layout, navigation }: PluginScreenProps
             <View key={t.id} style={styles.card}>
               <View style={styles.cardHeader}>
                 <Text style={styles.cardName}>{t.emoji ? `${t.emoji} ${t.name}` : t.name}</Text>
+                {t.syncConflict ? <Text style={{ color: c.statusDanger, fontSize: 11 }}>⚠ sync conflict</Text> : null}
                 <Pressable accessibilityRole="button" accessibilityLabel={`${t.name} menu`} onPress={(e) => openMenu(e, t)}>
                   <Text style={styles.dots}>⋯</Text>
                 </Pressable>
