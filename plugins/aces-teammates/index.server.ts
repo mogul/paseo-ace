@@ -133,7 +133,16 @@ export default function contribute(server: PluginServerContext) {
     return { agentId };
   });
 
-  server.on("agent.created", (_event, { paseo }) => capturePaseo(paseo));
+  server.on("agent.created", async (event, { paseo }) => {
+    capturePaseo(paseo);
+    try {
+      const refetched = await paseo.agents.ref(event.agent.id).refresh();
+      const teammateId = refetched?.agent.labels?.[TEAMMATE_ID_LABEL];
+      if (typeof teammateId === "string") presence.markActive(teammateId, event.agent.id);
+    } catch {
+      // ignore — presence is best-effort
+    }
+  });
   server.on("agent.turn_started", (_event, { paseo }) => capturePaseo(paseo));
   server.on("agent.turn_ended", (event, { paseo }) => void scheduler.onTurnEnded(event.agent.id, paseo));
 
