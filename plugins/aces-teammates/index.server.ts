@@ -16,7 +16,7 @@ import { buildSystemPrompt, createBoard, readBoards, TeammateStore } from "./ser
 
 export default function contribute(server: PluginServerContext) {
   const store = new TeammateStore();
-  setTimeout(() => ensureFrameworkRepo(), 0);
+  void ensureFrameworkRepo();
   const presence = new PresenceTracker();
   let paseoApi: PaseoApi | null = null;
 
@@ -60,6 +60,7 @@ export default function contribute(server: PluginServerContext) {
   });
 
   server.handle(teammateCreateRpc, async ({ name, description, provider, thinkingOptionId, boardId, boardName, heartbeatCron, persona, emoji }, { paseo }) => {
+    await ensureFrameworkRepo();
     capturePaseo(paseo);
 
     let resolvedBoardId = boardId;

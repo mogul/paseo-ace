@@ -1,9 +1,11 @@
+import { execSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { appendFileSync, copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { BoardSummary, Teammate } from "../shared/contracts";
 import { getPersona } from "../shared/personas";
+import { addTeammateWorktree, frameworkBaseBranch } from "./framework";
 
 interface TeammateRecord {
   id: string;
@@ -365,16 +367,24 @@ export class TeammateStore {
     };
 
     const seed = seedFiles(persona, name);
-    const dir = this.memoryPath(id);
-    mkdirSync(join(dir, "memory"), { recursive: true });
-    writeFileSync(join(dir, "SOUL.md"), seed.soul, "utf8");
-    writeFileSync(join(dir, "USER.md"), seed.user, "utf8");
-    writeFileSync(join(dir, "IDENTITY.md"), seed.identity, "utf8");
-    writeFileSync(join(dir, "AGENTS.md"), AGENTS_SEED, "utf8");
-    writeFileSync(join(dir, "BOOT.md"), BOOT_SEED, "utf8");
-    writeFileSync(join(dir, "ONBOARDING.md"), ONBOARDING_SEED, "utf8");
-    writeFileSync(join(dir, "BOARD.md"), BOARD_SEED, "utf8");
-    writeFileSync(join(dir, "HEARTBEAT.md"), HEARTBEAT_SEED, "utf8");
+    try {
+      const base = persona ? `template/${persona}` : frameworkBaseBranch();
+      addTeammateWorktree(id, base);
+      writeFileSync(join(this.memoryPath(id), "IDENTITY.md"), seed.identity, "utf8");
+      writeFileSync(join(this.memoryPath(id), "ONBOARDING.md"), ONBOARDING_SEED, "utf8");
+      execSync("git add -A", { cwd: this.memoryPath(id) });
+      execSync(`git commit -m "create teammate ${id}"`, { cwd: this.memoryPath(id) });
+    } catch {
+      writeFileSync(join(this.memoryPath(id), "SOUL.md"), seed.soul, "utf8");
+      writeFileSync(join(this.memoryPath(id), "USER.md"), seed.user, "utf8");
+      writeFileSync(join(this.memoryPath(id), "IDENTITY.md"), seed.identity, "utf8");
+      writeFileSync(join(this.memoryPath(id), "AGENTS.md"), AGENTS_SEED, "utf8");
+      writeFileSync(join(this.memoryPath(id), "BOOT.md"), BOOT_SEED, "utf8");
+      writeFileSync(join(this.memoryPath(id), "ONBOARDING.md"), ONBOARDING_SEED, "utf8");
+      writeFileSync(join(this.memoryPath(id), "BOARD.md"), BOARD_SEED, "utf8");
+      writeFileSync(join(this.memoryPath(id), "HEARTBEAT.md"), HEARTBEAT_SEED, "utf8");
+    }
+    mkdirSync(join(this.memoryPath(id), "memory"), { recursive: true });
 
     this.data.teammates.push(record);
     this.persist();

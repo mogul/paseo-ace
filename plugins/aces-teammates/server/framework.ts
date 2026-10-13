@@ -29,42 +29,74 @@ function branchExists(dir: string, branch: string): boolean {
   }
 }
 
-export function ensureFrameworkRepo(): void {
-  let dir: string;
+export function frameworkDir(): string {
+  return join(baseDir(), "framework");
+}
+
+export function frameworkBaseBranch(): string {
   try {
-    dir = join(baseDir(), "framework");
-    if (existsSync(join(dir, ".git"))) return;
-
-    mkdirSync(dir, { recursive: true });
-    run("git init", dir);
-    run("git config user.name aces", dir);
-    run("git config user.email aces@localhost", dir);
-
-    writeFile(dir, "AGENTS.md", AGENTS_SEED);
-    writeFile(dir, "BOOT.md", BOOT_SEED);
-    writeFile(dir, "BOARD.md", BOARD_SEED);
-    writeFile(dir, "HEARTBEAT.md", HEARTBEAT_SEED);
-    writeFile(dir, "SOUL.md", SOUL_SEED);
-    writeFile(dir, "USER.md", USER_SEED);
-    writeFile(dir, "IDENTITY.md", identitySeed("(name)"));
-
-    run("git add -A", dir);
-    run('git commit -m "framework: initial template"', dir);
-
-    const baseBranch = run("git branch --show-current", dir).trim() || "main";
-
-    for (const persona of PERSONAS) {
-      const branch = `template/${persona.id}`;
-      if (branchExists(dir, branch)) continue;
-      run(`git checkout -b ${branch}`, dir);
-      writeFile(dir, "SOUL.md", persona.soul);
-      writeFile(dir, "USER.md", persona.user);
-      writeFile(dir, "IDENTITY.md", persona.identity || identitySeed("(name)"));
-      run("git add -A", dir);
-      run(`git commit -m "template/${persona.id}: persona ${persona.name}"`, dir);
-      run(`git checkout ${baseBranch}`, dir);
-    }
-  } catch (error) {
-    console.warn(`aces-teammates: failed to initialize framework repo: ${error instanceof Error ? error.message : String(error)}`);
+    const branch = run("git branch --show-current", frameworkDir()).trim();
+    return branch || "master";
+  } catch {
+    return "master";
   }
+}
+
+export function addTeammateWorktree(slug: string, baseBranch: string): string {
+  const home = join(baseDir(), "teammates", slug);
+  run(`git worktree add ${JSON.stringify(home)} -b tm/${slug} ${baseBranch}`, frameworkDir());
+  return home;
+}
+
+function bootstrapRepo(): void {
+  const dir = frameworkDir();
+  if (existsSync(join(dir, ".git"))) return;
+
+  mkdirSync(dir, { recursive: true });
+  run("git init", dir);
+  run("git config user.name aces", dir);
+  run("git config user.email aces@localhost", dir);
+
+  writeFile(dir, "AGENTS.md", AGENTS_SEED);
+  writeFile(dir, "BOOT.md", BOOT_SEED);
+  writeFile(dir, "BOARD.md", BOARD_SEED);
+  writeFile(dir, "HEARTBEAT.md", HEARTBEAT_SEED);
+  writeFile(dir, "SOUL.md", SOUL_SEED);
+  writeFile(dir, "USER.md", USER_SEED);
+  writeFile(dir, "IDENTITY.md", identitySeed("(name)"));
+
+  run("git add -A", dir);
+  run('git commit -m "framework: initial template"', dir);
+
+  const baseBranch = run("git branch --show-current", dir).trim() || "main";
+
+  for (const persona of PERSONAS) {
+    const branch = `template/${persona.id}`;
+    if (branchExists(dir, branch)) continue;
+    run(`git checkout -b ${branch}`, dir);
+    writeFile(dir, "SOUL.md", persona.soul);
+    writeFile(dir, "USER.md", persona.user);
+    writeFile(dir, "IDENTITY.md", persona.identity || identitySeed("(name)"));
+    run("git add -A", dir);
+    run(`git commit -m "template/${persona.id}: persona ${persona.name}"`, dir);
+    run(`git checkout ${baseBranch}`, dir);
+  }
+}
+
+let ready: Promise<void> | null = null;
+
+export function ensureFrameworkRepo(): Promise<void> {
+  if (!ready) {
+    ready = new Promise<void>((resolve) => {
+      setTimeout(() => {
+        try {
+          bootstrapRepo();
+        } catch (error) {
+          console.warn(`aces-teammates: failed to initialize framework repo: ${error instanceof Error ? error.message : String(error)}`);
+        }
+        resolve();
+      }, 0);
+    });
+  }
+  return ready;
 }
