@@ -6,6 +6,7 @@ import { join } from "node:path";
 import type { BoardSummary, Teammate } from "../shared/contracts";
 import { getPersona } from "../shared/personas";
 import { addTeammateWorktree, frameworkBaseBranch, syncTeammateBranch } from "./framework";
+import { buildTeammateSystemPrompt, DEFAULT_TEAMMATE_PROVIDER } from "./teammate-prompt";
 
 interface TeammateRecord {
   id: string;
@@ -24,7 +25,7 @@ interface TeammateRecord {
   createdAt: string;
 }
 
-export const DEFAULT_PROVIDER = "opencode/opencode-go/deepseek-v4-flash";
+export const DEFAULT_PROVIDER = DEFAULT_TEAMMATE_PROVIDER;
 
 // The current framework/template version. Stamped on every teammate at creation;
 // bumped when the plugin's seeded template files change meaning. See
@@ -471,39 +472,9 @@ export class TeammateStore {
   }
 }
 
-// Returns the unmerged files when the teammate's home is mid-rebase (empty otherwise).
-function rebaseConflicts(dir: string): string[] {
-  try {
-    const mergePath = execSync("git rev-parse --git-path rebase-merge", { cwd: dir, encoding: "utf8" }).trim();
-    const applyPath = execSync("git rev-parse --git-path rebase-apply", { cwd: dir, encoding: "utf8" }).trim();
-    if (!existsSync(mergePath) && !existsSync(applyPath)) return [];
-    return execSync("git diff --name-only --diff-filter=U", { cwd: dir, encoding: "utf8" }).trim().split(/\s+/).filter(Boolean);
-  } catch {
-    return [];
-  }
-}
-
 // Shared prompt assembly used by both teammate.start and the heartbeat scheduler.
 export function buildSystemPrompt(store: TeammateStore, id: string): { name: string; systemPrompt: string; provider: string; thinkingOptionId?: string } {
   const teammate = store.get(id);
-  const agents = store.readText(id, "AGENTS.md");
-  const boot = store.readText(id, "BOOT.md");
-  const onboarding = store.readText(id, "ONBOARDING.md");
-  const identity = store.readText(id, "IDENTITY.md");
-  const soul = store.readText(id, "SOUL.md");
-  const user = store.readText(id, "USER.md");
-  const memory = store.readMemory(id, 7);
-  const conflicts = rebaseConflicts(store.memoryPath(id));
-  const systemPrompt =
-    `You are the teammate named ${teammate.name}.\n\n` +
-    `${agents}\n\n` +
-    `${identity}\n${soul}\n${user}\n\n` +
-    `${boot}\n\n` +
-    (onboarding ? `${onboarding}\n\n` : "") +
-    `Recent memory:\n${memory}\n\n` +
-    `You may append what you learn to your memory using the teammate_memory_append tool with teammate = "${teammate.id}". You are "${teammate.id}".` +
-    (conflicts.length > 0
-      ? `\n\nYour branch is mid-rebase with conflicts in: ${conflicts.join(", ")}. Resolve them before other work. For AGENTS.md and BOOT.md, take the incoming (framework) side. For SOUL.md, USER.md, IDENTITY.md, BOARD.md, HEARTBEAT.md, and memory/, keep your own content. When both sides have meaningful content, ask the user. Then run git add and git rebase --continue, or git rebase --abort to back out.`
-      : "");
+  const systemPrompt = buildTeammateSystemPrompt({ name: teammate.name, id: teammate.id, homeDir: store.memoryPath(id) });
   return { name: teammate.name, systemPrompt, provider: teammate.provider || DEFAULT_PROVIDER, thinkingOptionId: teammate.thinkingOptionId };
 }
