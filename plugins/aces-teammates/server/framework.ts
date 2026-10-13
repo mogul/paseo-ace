@@ -48,6 +48,54 @@ export function addTeammateWorktree(slug: string, baseBranch: string): string {
   return home;
 }
 
+function readFrameworkVersion(dir: string): string {
+  try {
+    return run("git config framework.version", dir).trim();
+  } catch {
+    return "";
+  }
+}
+
+function commitIfChanged(dir: string, message: string): void {
+  try {
+    run("git add -A", dir);
+    run(`git commit -m ${JSON.stringify(message)}`, dir);
+  } catch {
+    // nothing to commit — ignore
+  }
+}
+
+// Rewrites the framework template branches to the current seeds. Persona
+// SOUL/USER/IDENTITY are preserved; only the framework files (AGENTS/BOOT/
+// BOARD/HEARTBEAT) and the blank master identity are refreshed.
+function updateTemplate(dir: string, version: string): void {
+  const base = run("git branch --show-current", dir).trim() || "master";
+
+  run(`git checkout ${base}`, dir);
+  writeFile(dir, "AGENTS.md", AGENTS_SEED);
+  writeFile(dir, "BOOT.md", BOOT_SEED);
+  writeFile(dir, "BOARD.md", BOARD_SEED);
+  writeFile(dir, "HEARTBEAT.md", HEARTBEAT_SEED);
+  writeFile(dir, "SOUL.md", SOUL_SEED);
+  writeFile(dir, "USER.md", USER_SEED);
+  writeFile(dir, "IDENTITY.md", identitySeed("(name)"));
+  commitIfChanged(dir, "framework: update template");
+
+  for (const persona of PERSONAS) {
+    const branch = `template/${persona.id}`;
+    if (!branchExists(dir, branch)) continue;
+    run(`git checkout ${branch}`, dir);
+    writeFile(dir, "AGENTS.md", AGENTS_SEED);
+    writeFile(dir, "BOOT.md", BOOT_SEED);
+    writeFile(dir, "BOARD.md", BOARD_SEED);
+    writeFile(dir, "HEARTBEAT.md", HEARTBEAT_SEED);
+    commitIfChanged(dir, `template/${persona.id}: framework update`);
+    run(`git checkout ${base}`, dir);
+  }
+
+  run(`git config framework.version ${version}`, dir);
+}
+
 function bootstrapRepo(): void {
   const dir = frameworkDir();
   if (existsSync(join(dir, ".git"))) return;
@@ -86,14 +134,21 @@ function bootstrapRepo(): void {
 
 let ready: Promise<void> | null = null;
 
-export function ensureFrameworkRepo(): Promise<void> {
+export function ensureFrameworkRepo(version: string): Promise<void> {
   if (!ready) {
     ready = new Promise<void>((resolve) => {
       setTimeout(() => {
         try {
+          const dir = frameworkDir();
+          const wasMissing = !existsSync(join(dir, ".git"));
           bootstrapRepo();
+          if (wasMissing) {
+            run(`git config framework.version ${version}`, dir);
+          } else if (readFrameworkVersion(dir) !== version) {
+            updateTemplate(dir, version);
+          }
         } catch (error) {
-          console.warn(`aces-teammates: failed to initialize framework repo: ${error instanceof Error ? error.message : String(error)}`);
+          console.warn(`aces-teammates: failed to update framework repo: ${error instanceof Error ? error.message : String(error)}`);
         }
         resolve();
       }, 0);

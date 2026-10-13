@@ -313,6 +313,14 @@ export class TeammateStore {
       if (!existsSync(join(dir, "ONBOARDING.md"))) {
         writeFileSync(join(dir, "ONBOARDING.md"), ONBOARDING_SEED, "utf8");
       }
+      if (existsSync(join(dir, ".git"))) {
+        try {
+          execSync("git add -A", { cwd: dir });
+          execSync(`git commit -m "framework update v${FRAMEWORK_VERSION}"`, { cwd: dir });
+        } catch {
+          // not a git worktree or nothing to commit — ignore
+        }
+      }
       record.frameworkVersion = FRAMEWORK_VERSION;
       changed = true;
     }

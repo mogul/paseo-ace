@@ -12,11 +12,11 @@ import { ensureFrameworkRepo } from "./server/framework";
 import { McpServer } from "./server/mcp";
 import { PresenceTracker } from "./server/presence";
 import { HeartbeatScheduler, buildHeartbeatPrompt } from "./server/scheduler";
-import { buildSystemPrompt, createBoard, readBoards, TeammateStore } from "./server/teammates";
+import { buildSystemPrompt, createBoard, FRAMEWORK_VERSION, readBoards, TeammateStore } from "./server/teammates";
 
 export default function contribute(server: PluginServerContext) {
   const store = new TeammateStore();
-  void ensureFrameworkRepo();
+  void ensureFrameworkRepo(FRAMEWORK_VERSION);
   const presence = new PresenceTracker();
   let paseoApi: PaseoApi | null = null;
 
@@ -60,7 +60,7 @@ export default function contribute(server: PluginServerContext) {
   });
 
   server.handle(teammateCreateRpc, async ({ name, description, provider, thinkingOptionId, boardId, boardName, heartbeatCron, persona, emoji }, { paseo }) => {
-    await ensureFrameworkRepo();
+    await ensureFrameworkRepo(FRAMEWORK_VERSION);
     capturePaseo(paseo);
 
     let resolvedBoardId = boardId;
