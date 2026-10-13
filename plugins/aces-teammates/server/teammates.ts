@@ -98,29 +98,18 @@ This file guides your first run and tracks progress. Keep it current; it is a li
 Onboarding is complete once a useful working relationship exists. Before deleting this file, move durable facts to USER.md, IDENTITY.md, and SOUL.md, and record them in memory.`;
 
 // ---------------------------------------------------------------------------
-// Template versioning — FRAMEWORK vs LEARNED files
+// FRAMEWORK vs LEARNED files
 //
-// A teammate's home dir holds two classes of files:
-//   - FRAMEWORK files are "owned by the template": they carry plugin semantics
-//     (resident-board zone meaning, heartbeat tasks, operating manual, startup
-//     checklist) rather than personal data, so they are safe to overwrite when
-//     FRAMEWORK_VERSION bumps.
-//   - LEARNED files are owned by the teammate/user and must NEVER be overwritten:
-//     SOUL.md, USER.md, IDENTITY.md, and the memory/ directory hold the
-//     teammate's accumulated identity and memory. ONBOARDING.md is seeded once at
-//     first-run and then owned by the teammate, so it is bridged into a new
-//     teammate via create()/migrateFramework() but never re-seeded.
-//
-// FRAMEWORK_FILES maps the template-owned filenames to their current seed. The
-// LEARNED set is documented here for clarity only; migrateFramework never
-// touches it.
+// A teammate's home holds two classes of files:
+//   - FRAMEWORK files are owned by the template: AGENTS.md (operating manual)
+//     and BOOT.md (startup checklist). They live on the framework repo's
+//     `master`/`template/<persona>` branches and reach a teammate by `git
+//     rebase` onto its base branch (the "Sync framework" action), never by
+//     overwriting a teammate's working files.
+//   - LEARNED files are owned by the teammate and seeded once at creation:
+//     SOUL.md, USER.md, IDENTITY.md, ONBOARDING.md, BOARD.md, HEARTBEAT.md,
+//     and the memory/ directory.
 // ---------------------------------------------------------------------------
-const FRAMEWORK_FILES: Record<string, string> = {
-  "AGENTS.md": AGENTS_SEED,
-  "BOOT.md": BOOT_SEED,
-  "BOARD.md": BOARD_SEED,
-  "HEARTBEAT.md": HEARTBEAT_SEED,
-};
 
 // Compares dotted numeric versions ("1", "1.2", "10"). Returns <0, 0, or >0.
 function compareFrameworkVersions(a: string, b: string): number {
@@ -295,33 +284,16 @@ export class TeammateStore {
     this.migrateFramework();
   }
 
-  // Runs once at plugin load. For each teammate whose frameworkVersion is
-  // missing or older than FRAMEWORK_VERSION, overwrite the FRAMEWORK files from
-  // the current templates and bump frameworkVersion. LEARNED files (SOUL.md,
-  // USER.md, IDENTITY.md, memory/) are never touched. At v1 every teammate is
-  // created with FRAMEWORK_VERSION, so this is a no-op; the classification and
-  // mechanism are in place for future bumps.
+  // Seeds newly-introduced LEARNED files for pre-existing teammates. Framework
+  // files (AGENTS.md/BOOT.md) are never overwritten here — they reach a teammate
+  // via `git rebase` onto its base branch (the "Sync framework" action).
   private migrateFramework(): void {
     let changed = false;
     for (const record of this.data.teammates) {
-      if (!isFrameworkOutdated(record.frameworkVersion)) continue;
       const dir = this.memoryPath(record.id);
+      if (existsSync(join(dir, "ONBOARDING.md"))) continue;
       mkdirSync(dir, { recursive: true });
-      for (const [filename, seed] of Object.entries(FRAMEWORK_FILES)) {
-        writeFileSync(join(dir, filename), seed, "utf8");
-      }
-      if (!existsSync(join(dir, "ONBOARDING.md"))) {
-        writeFileSync(join(dir, "ONBOARDING.md"), ONBOARDING_SEED, "utf8");
-      }
-      if (existsSync(join(dir, ".git"))) {
-        try {
-          execSync("git add -A", { cwd: dir });
-          execSync(`git commit -m "framework update v${FRAMEWORK_VERSION}"`, { cwd: dir });
-        } catch {
-          // not a git worktree or nothing to commit — ignore
-        }
-      }
-      record.frameworkVersion = FRAMEWORK_VERSION;
+      writeFileSync(join(dir, "ONBOARDING.md"), ONBOARDING_SEED, "utf8");
       changed = true;
     }
     if (changed) this.persist();
