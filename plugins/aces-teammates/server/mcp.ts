@@ -1,4 +1,7 @@
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
+import { homedir } from "node:os";
+import { join } from "node:path";
 
 export interface McpHandlers {
   listTeammates: () => { id: string; name: string }[];
@@ -39,6 +42,33 @@ const TOOLS = [
   },
 ];
 
+function mcpPortFile(): string {
+  const base = process.env.PASEO_HOME || join(homedir(), ".paseo");
+  return join(base, "aces", "teammates-mcp-port.json");
+}
+
+function readPersistedPort(): number {
+  try {
+    if (existsSync(mcpPortFile())) {
+      const value = JSON.parse(readFileSync(mcpPortFile(), "utf8")) as unknown;
+      return typeof value === "number" && value > 0 ? value : 0;
+    }
+  } catch {
+    // ignore
+  }
+  return 0;
+}
+
+function persistPort(port: number): void {
+  try {
+    const base = process.env.PASEO_HOME || join(homedir(), ".paseo");
+    mkdirSync(join(base, "aces"), { recursive: true });
+    writeFileSync(mcpPortFile(), JSON.stringify(port), "utf8");
+  } catch {
+    // ignore
+  }
+}
+
 export class McpServer {
   private server: Server | null = null;
   private port = 0;
@@ -50,13 +80,29 @@ export class McpServer {
 
   start(): void {
     if (this.server) return;
-    this.server = createServer((req, res) => {
+    this.listenOn(readPersistedPort() || 0);
+  }
+
+  private listenOn(port: number): void {
+    const server = createServer((req, res) => {
       void this.handleRequest(req, res);
     });
-    this.server.listen(0, "127.0.0.1", () => {
-      const address = this.server?.address();
+    this.server = server;
+    const onError = (err: Error) => {
+      if (port !== 0 && (err as { code?: string }).code === "EADDRINUSE") {
+        this.server = null;
+        this.listenOn(0);
+      } else {
+        console.error("[aces-teammates] MCP server failed to listen:", err);
+      }
+    };
+    server.once("error", onError);
+    server.listen(port, "127.0.0.1", () => {
+      server.removeListener("error", onError);
+      const address = server.address();
       if (address && typeof address === "object") {
         this.port = address.port;
+        persistPort(this.port);
       }
       console.log(`[aces-teammates] MCP server listening at ${this.url()}`);
     });
