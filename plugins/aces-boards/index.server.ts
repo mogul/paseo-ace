@@ -43,6 +43,16 @@ export default function contribute(server: PluginServerContext) {
         return { ok: false, error: error instanceof Error ? error.message : String(error) };
       }
     },
+    createCard: async (input) => {
+      if (!paseoApi) return { ok: false, error: "Paseo API is not available yet." };
+      try {
+        const boardId = input.boardId ?? store.current().id;
+        const workspaceId = await engine.createCard({ boardId, zoneId: input.zoneId, name: input.name, projectCwd: input.projectCwd, isolation: "worktree", prompt: input.prompt });
+        return { ok: true, workspaceId };
+      } catch (error) {
+        return { ok: false, error: error instanceof Error ? error.message : String(error) };
+      }
+    },
     buildWorkspaces: async () => {
       if (!paseoApi) throw new Error("Paseo API is not available yet.");
       return buildWorkspaceCards(paseoApi, store.current());

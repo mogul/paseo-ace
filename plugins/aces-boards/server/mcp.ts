@@ -5,6 +5,7 @@ export interface McpHandlers {
   getCurrentBoard: () => Board;
   listBoards: () => BoardSummary[];
   moveCard: (workspaceId: string, zoneId: string, boardId?: string) => Promise<{ ok: boolean; error?: string }>;
+  createCard: (input: { zoneId: string; name: string; projectCwd: string; boardId?: string; prompt?: string }) => Promise<{ ok: boolean; workspaceId?: string; error?: string }>;
   buildWorkspaces: () => Promise<WorkspaceCard[]>;
 }
 
@@ -28,6 +29,21 @@ const TOOLS = [
       type: "object",
       properties: { workspaceId: { type: "string" }, zoneId: { type: "string" }, boardId: { type: "string" } },
       required: ["workspaceId", "zoneId"],
+    },
+  },
+  {
+    name: "board_create_card",
+    description: "Create a workspace card in a zone (spawns a git branch/workspace and optionally an initial agent).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        zoneId: { type: "string" },
+        name: { type: "string" },
+        projectCwd: { type: "string" },
+        boardId: { type: "string" },
+        prompt: { type: "string" },
+      },
+      required: ["zoneId", "name", "projectCwd"],
     },
   },
 ];
@@ -145,6 +161,25 @@ export class McpServer {
       }
       try {
         const result = await handlers.moveCard(workspaceId, zoneId, boardId);
+        this.toolResult(res, id, result);
+      } catch (error) {
+        this.toolError(res, id, error);
+      }
+      return;
+    }
+
+    if (name === "board_create_card") {
+      const zoneId = args.zoneId;
+      const name = args.name;
+      const projectCwd = args.projectCwd;
+      const boardId = typeof args.boardId === "string" ? args.boardId : undefined;
+      const prompt = typeof args.prompt === "string" ? args.prompt : undefined;
+      if (typeof zoneId !== "string" || typeof name !== "string" || typeof projectCwd !== "string") {
+        this.toolError(res, id, new Error("zoneId, name, and projectCwd are required string arguments."));
+        return;
+      }
+      try {
+        const result = await handlers.createCard({ zoneId, name, projectCwd, boardId, prompt });
         this.toolResult(res, id, result);
       } catch (error) {
         this.toolError(res, id, error);
