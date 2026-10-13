@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { appendFileSync, copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -10,6 +11,7 @@ interface TeammateRecord {
   description?: string;
   provider?: string;
   thinkingOptionId?: string;
+  lastAgentId?: string;
   boardId?: string;
   boardName?: string;
   heartbeatCron?: string;
@@ -24,7 +26,7 @@ export const DEFAULT_PROVIDER = "opencode/opencode-go/deepseek-v4-flash";
 // The current framework/template version. Stamped on every teammate at creation;
 // bumped when the plugin's seeded template files change meaning. See
 // migrateFramework() for how upgrades are applied.
-export const FRAMEWORK_VERSION = "1";
+export const FRAMEWORK_VERSION = "2";
 
 interface TeammatesData {
   teammates: TeammateRecord[];
@@ -36,22 +38,84 @@ const BOARD_SEED = "# Board\n\nDescribe what each zone on this board means and h
 const HEARTBEAT_SEED =
   "# Heartbeat\n\nOptional periodic tasks: review board state, triage new work, summarize to memory.";
 
+const AGENTS_SEED = `# Agents
+
+You are an AI teammate living in a Paseo home directory. Your home holds your identity, memory, and operating notes; it is not a code checkout.
+
+## Priorities
+1. Understand the outcome the user is after before acting.
+2. Get close to the real work — read the actual files, run the actual commands.
+3. Record durable memory so the next session starts warm.
+4. Stay safe: never take destructive or irreversible actions without confirmation.
+
+## Working model
+- Home files: your SOUL.md, IDENTITY.md, and USER.md define who you are; read them and keep them current.
+- Memory: append what you learn with the teammate_memory_append tool (teammate = your id) and recall it with teammate_memory_read.
+- Board: use board_list and board_move_card to read and move cards on your board.
+- Code work: prefer an isolated workspace over editing in place, so changes stay reviewable.
+
+## Reference files
+| File | Purpose |
+| --- | --- |
+| BOOT.md | Startup checklist for a fresh session |
+| ONBOARDING.md | First-run guide and progress record |
+| SOUL.md | Personality, communication style, principles |
+| IDENTITY.md | Name and purpose |
+| USER.md | What you know about the user |
+| BOARD.md | Meaning of each board zone |
+| HEARTBEAT.md | Periodic tasks |
+
+On a fresh session, read and follow BOOT.md.`;
+const BOOT_SEED =
+  "# Boot\n\nAt the start of a fresh session, quietly rebuild context before replying: 1. You are already provided your SOUL.md, IDENTITY.md, and USER.md. 2. In a user-facing session, if ONBOARDING.md is present, follow it and use its current state as context; address the user's request first. 3. Search recent memory for relevant context; read BOARD.md only when the work needs it. Do not narrate this process.";
+const ONBOARDING_SEED = `# Onboarding
+
+This file guides your first run and tracks progress. Keep it current; it is a live record, not just instructions.
+
+## How to start
+- Start with the user's work and the outcome they want.
+- Offer a brief orientation to Paseo if it helps.
+- Get close to the work: explore workspaces, the board, and memory.
+- Move toward a concrete result the user can see.
+
+## Current state
+- Last updated: (date)
+- Primary outcome: (write it here)
+- Current focus: (write it here)
+- Next useful step: (write it here)
+
+| Step | Status |
+| --- | --- |
+| Initial goal and working context | not explored |
+| Paseo orientation | not explored |
+| First useful result | not explored |
+| Board and workflow | not explored |
+| Recurring value | not explored |
+
+## Complete onboarding
+Onboarding is complete once a useful working relationship exists. Before deleting this file, move durable facts to USER.md, IDENTITY.md, and SOUL.md, and record them in memory.`;
+
 // ---------------------------------------------------------------------------
 // Template versioning — FRAMEWORK vs LEARNED files
 //
 // A teammate's home dir holds two classes of files:
 //   - FRAMEWORK files are "owned by the template": they carry plugin semantics
-//     (resident-board zone meaning, heartbeat tasks) rather than personal data,
-//     so they are safe to overwrite when FRAMEWORK_VERSION bumps.
+//     (resident-board zone meaning, heartbeat tasks, operating manual, startup
+//     checklist) rather than personal data, so they are safe to overwrite when
+//     FRAMEWORK_VERSION bumps.
 //   - LEARNED files are owned by the teammate/user and must NEVER be overwritten:
 //     SOUL.md, USER.md, IDENTITY.md, and the memory/ directory hold the
-//     teammate's accumulated identity and memory.
+//     teammate's accumulated identity and memory. ONBOARDING.md is seeded once at
+//     first-run and then owned by the teammate, so it is bridged into a new
+//     teammate via create()/migrateFramework() but never re-seeded.
 //
 // FRAMEWORK_FILES maps the template-owned filenames to their current seed. The
 // LEARNED set is documented here for clarity only; migrateFramework never
 // touches it.
 // ---------------------------------------------------------------------------
 const FRAMEWORK_FILES: Record<string, string> = {
+  "AGENTS.md": AGENTS_SEED,
+  "BOOT.md": BOOT_SEED,
   "BOARD.md": BOARD_SEED,
   "HEARTBEAT.md": HEARTBEAT_SEED,
 };
@@ -142,9 +206,10 @@ function migrate(): void {
   }
 }
 
-// Read-only coupling to the `aces-boards` plugin's board store. This is the only touch
-// point between the two plugins; treat aces-boards' BoardsData schema as the contract
-// and never write to it from here.
+// Read-only coupling to the `aces-boards` plugin's board store for listing. The
+// `createBoard` write below is the only place aces-teammates writes board state:
+// it appends a dedicated board (matching aces-boards' BoardsData shape) when a
+// teammate is created without an explicit board picker choice.
 export function readBoards(): BoardSummary[] {
   const base = process.env.PASEO_HOME || join(homedir(), ".paseo");
   const path = join(base, "aces", "boards.json");
@@ -164,6 +229,38 @@ export function readBoards(): BoardSummary[] {
   } catch {
     return [];
   }
+}
+
+export function createBoard(name: string): { id: string; name: string } {
+  const base = process.env.PASEO_HOME || join(homedir(), ".paseo");
+  const dir = join(base, "aces");
+  const path = join(dir, "boards.json");
+  const id = "board-" + randomUUID().slice(0, 8);
+  const board = {
+    id,
+    name,
+    groups: [{ id: "col-" + randomUUID().slice(0, 8), title: "New zone", zones: [{ id: "zone-" + randomUUID().slice(0, 8), title: "New zone" }] }],
+    placement: {},
+    cardDefaults: { isolation: "worktree" },
+  };
+
+  let boards: unknown[] = [];
+  let lastVisitedBoardId: string | undefined;
+  try {
+    if (existsSync(path)) {
+      const parsed = JSON.parse(readFileSync(path, "utf8")) as { boards?: unknown; lastVisitedBoardId?: unknown };
+      if (Array.isArray(parsed.boards)) boards = parsed.boards as unknown[];
+      if (typeof parsed.lastVisitedBoardId === "string") lastVisitedBoardId = parsed.lastVisitedBoardId;
+    }
+  } catch {
+    boards = [];
+  }
+  boards.push(board);
+  mkdirSync(dir, { recursive: true });
+  const tmp = path + ".tmp";
+  writeFileSync(tmp, JSON.stringify({ boards, lastVisitedBoardId: lastVisitedBoardId ?? id }, null, 2), "utf8");
+  renameSync(tmp, path);
+  return { id, name };
 }
 
 function slugify(name: string): string {
@@ -210,6 +307,9 @@ export class TeammateStore {
       mkdirSync(dir, { recursive: true });
       for (const [filename, seed] of Object.entries(FRAMEWORK_FILES)) {
         writeFileSync(join(dir, filename), seed, "utf8");
+      }
+      if (!existsSync(join(dir, "ONBOARDING.md"))) {
+        writeFileSync(join(dir, "ONBOARDING.md"), ONBOARDING_SEED, "utf8");
       }
       record.frameworkVersion = FRAMEWORK_VERSION;
       changed = true;
@@ -270,6 +370,9 @@ export class TeammateStore {
     writeFileSync(join(dir, "SOUL.md"), seed.soul, "utf8");
     writeFileSync(join(dir, "USER.md"), seed.user, "utf8");
     writeFileSync(join(dir, "IDENTITY.md"), seed.identity, "utf8");
+    writeFileSync(join(dir, "AGENTS.md"), AGENTS_SEED, "utf8");
+    writeFileSync(join(dir, "BOOT.md"), BOOT_SEED, "utf8");
+    writeFileSync(join(dir, "ONBOARDING.md"), ONBOARDING_SEED, "utf8");
     writeFileSync(join(dir, "BOARD.md"), BOARD_SEED, "utf8");
     writeFileSync(join(dir, "HEARTBEAT.md"), HEARTBEAT_SEED, "utf8");
 
@@ -288,6 +391,12 @@ export class TeammateStore {
     record.emoji = emoji?.trim() || undefined;
     this.persist();
     return this.toTeammate(record);
+  }
+
+  setLastAgentId(id: string, agentId: string): void {
+    const record = this.record(id);
+    record.lastAgentId = agentId;
+    this.persist();
   }
 
   delete(id: string): void {
@@ -348,13 +457,19 @@ export class TeammateStore {
 // Shared prompt assembly used by both teammate.start and the heartbeat scheduler.
 export function buildSystemPrompt(store: TeammateStore, id: string): { name: string; systemPrompt: string; provider: string; thinkingOptionId?: string } {
   const teammate = store.get(id);
+  const agents = store.readText(id, "AGENTS.md");
+  const boot = store.readText(id, "BOOT.md");
+  const onboarding = store.readText(id, "ONBOARDING.md");
   const identity = store.readText(id, "IDENTITY.md");
   const soul = store.readText(id, "SOUL.md");
   const user = store.readText(id, "USER.md");
   const memory = store.readMemory(id, 7);
   const systemPrompt =
     `You are the teammate named ${teammate.name}.\n\n` +
+    `${agents}\n\n` +
     `${identity}\n${soul}\n${user}\n\n` +
+    `${boot}\n\n` +
+    (onboarding ? `${onboarding}\n\n` : "") +
     `Recent memory:\n${memory}\n\n` +
     `You may append what you learn to your memory using the teammate_memory_append tool with teammate = "${teammate.id}". You are "${teammate.id}".`;
   return { name: teammate.name, systemPrompt, provider: teammate.provider || DEFAULT_PROVIDER, thinkingOptionId: teammate.thinkingOptionId };

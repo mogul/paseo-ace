@@ -1,6 +1,6 @@
 import type { PluginTheme } from "@getpaseo/plugin";
 import type { PluginScreenProps } from "@getpaseo/plugin/client";
-import { usePaseo, useRpc } from "@getpaseo/plugin/client";
+import { useRpc } from "@getpaseo/plugin/client";
 import { copyText, Modal, ScrollView as HostScrollView, TextInput as HostTextInput, useToast } from "@getpaseo/plugin/client/react-native";
 import { ExternalLink } from "@getpaseo/plugin/client/ui";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -35,7 +35,6 @@ const HEARTBEAT_PRESETS: { label: string; cron: string }[] = [
 
 type Overlay =
   | { kind: "new" }
-  | { kind: "start"; teammate: Teammate }
   | { kind: "rename"; teammate: Teammate }
   | { kind: "delete"; teammate: Teammate };
 
@@ -113,7 +112,8 @@ export function TeammatesScreen({ theme, layout, navigation }: PluginScreenProps
 
   async function handleCreate(input: { name: string; description?: string; provider?: string; thinkingOptionId?: string; boardId?: string; boardName?: string; heartbeatCron?: string; persona?: string; emoji?: string }) {
     try {
-      await create(input);
+      const { agentId } = await create(input);
+      if (agentId) navigation?.openAgent({ agentId });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : String(err));
       return;
@@ -144,9 +144,9 @@ export function TeammatesScreen({ theme, layout, navigation }: PluginScreenProps
     setOverlay(null);
   }
 
-  async function handleStart(teammate: Teammate, workspaceId?: string) {
+  async function handleStart(teammate: Teammate) {
     try {
-      const { agentId } = await start({ id: teammate.id, workspaceId });
+      const { agentId } = await start({ id: teammate.id });
       navigation?.openAgent({ agentId });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : String(err));
@@ -215,7 +215,7 @@ export function TeammatesScreen({ theme, layout, navigation }: PluginScreenProps
               {t.boardId && t.heartbeatCron ? <Text style={styles.muted}>Board agent (heartbeat: {t.heartbeatCron})</Text> : null}
               {t.provider ? <Text style={styles.muted}>{t.provider}</Text> : null}
               <View style={styles.cardActions}>
-                <Pressable accessibilityRole="button" accessibilityLabel={`Start ${t.name}`} onPress={() => setOverlay({ kind: "start", teammate: t })} style={styles.startBtn}>
+                <Pressable accessibilityRole="button" accessibilityLabel={`Start ${t.name}`} onPress={() => void handleStart(t)} style={styles.startBtn}>
                   <Text style={styles.startBtnText}>Start</Text>
                 </Pressable>
               </View>
@@ -235,7 +235,6 @@ export function TeammatesScreen({ theme, layout, navigation }: PluginScreenProps
           onCreate={handleCreate}
           onRename={handleRename}
           onDelete={handleDelete}
-          onStart={handleStart}
         />
       ) : null}
     </View>
@@ -269,7 +268,6 @@ function OverlayView({
   onCreate,
   onRename,
   onDelete,
-  onStart,
 }: {
   overlay: Overlay;
   theme: PluginTheme;
@@ -278,13 +276,10 @@ function OverlayView({
   onCreate: (input: { name: string; description?: string; provider?: string; thinkingOptionId?: string; boardId?: string; boardName?: string; heartbeatCron?: string; persona?: string; emoji?: string }) => void;
   onRename: (teammate: Teammate, name: string, boardId?: string, boardName?: string, heartbeatCron?: string, emoji?: string) => void;
   onDelete: (teammate: Teammate) => void;
-  onStart: (teammate: Teammate, workspaceId?: string) => void;
 }) {
   switch (overlay.kind) {
     case "new":
       return <NewTeammateModal theme={theme} boards={boards} onClose={onClose} onCreate={onCreate} />;
-    case "start":
-      return <StartModal theme={theme} teammate={overlay.teammate} onClose={onClose} onStart={(workspaceId) => onStart(overlay.teammate, workspaceId)} />;
     case "rename":
       return <RenameModal theme={theme} teammate={overlay.teammate} boards={boards} onClose={onClose} onRename={onRename} />;
     case "delete":
@@ -521,36 +516,6 @@ function NewTeammateModal({ theme, boards, onClose, onCreate }: { theme: PluginT
             <Text style={{ color: c.accentForeground, fontWeight: "600" }}>Create</Text>
           </Pressable>
         </View>
-      </Modal.Content>
-    </Modal>
-  );
-}
-
-function StartModal({ theme, teammate, onClose, onStart }: { theme: PluginTheme; teammate: Teammate; onClose: () => void; onStart: (workspaceId?: string) => void }) {
-  const c = theme.colors;
-  const paseo = usePaseo();
-  const workspacesQuery = useQuery({
-    queryKey: ["aces-teammates", "workspaces"],
-    queryFn: async () => (await paseo.workspaces.list()).entries,
-  });
-  const workspaces = (workspacesQuery.data ?? []).filter((w) => !w.archivingAt);
-
-  return (
-    <Modal title={`Start ${teammate.name}`} open onOpenChange={(o) => { if (!o) onClose(); }}>
-      <Modal.Content scrollable={false} contentContainerStyle={{ gap: 12 }}>
-        <HostScrollView style={{ maxHeight: 320 }}>
-          <Pressable accessibilityRole="button" onPress={() => onStart(undefined)} style={{ padding: 10, borderRadius: 8, backgroundColor: c.border, marginBottom: 6 }}>
-            <Text style={{ color: c.foreground }}>No workspace (run in teammate home)</Text>
-          </Pressable>
-          {workspaces.map((w) => (
-            <Pressable key={w.id} accessibilityRole="button" onPress={() => onStart(w.id)} style={{ padding: 10, borderRadius: 8, backgroundColor: c.border, marginBottom: 6 }}>
-              <Text style={{ color: c.foreground }}>{w.name}</Text>
-            </Pressable>
-          ))}
-        </HostScrollView>
-        <Pressable accessibilityRole="button" onPress={onClose} style={btn(c)}>
-          <Text style={{ color: c.foreground }}>Cancel</Text>
-        </Pressable>
       </Modal.Content>
     </Modal>
   );

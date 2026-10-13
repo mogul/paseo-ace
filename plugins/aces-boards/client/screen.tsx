@@ -648,10 +648,19 @@ export function BoardScreen({ theme, layout, navigation }: PluginScreenProps) {
             {boardTeammates.map((t) => {
               const active = activeTeammateIds.has(t.id);
               return (
-                <View key={t.id} accessible accessibilityLabel={t.name} style={styles.teammateItem}>
+                <Pressable
+                  key={t.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={t.lastAgentId ? `Open ${t.name} latest session` : `${t.name} has no session yet`}
+                  onPress={() => {
+                    if (t.lastAgentId) navigation?.openAgent({ agentId: t.lastAgentId });
+                    else toast.show(`No session yet — start ${t.name} from the Teammates screen.`);
+                  }}
+                  style={styles.teammateItem}
+                >
                   <Text style={[styles.teammateEmoji, !active && styles.teammateEmojiInactive]}>{t.emoji ?? "🤖"}</Text>
                   {active ? <View style={styles.teammateActiveDot} /> : null}
-                </View>
+                </Pressable>
               );
             })}
           </View>

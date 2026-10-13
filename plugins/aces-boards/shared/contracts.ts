@@ -99,6 +99,7 @@ export const BoardTeammateSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
   emoji: z.string().optional(),
+  lastAgentId: z.string().optional(),
   boardId: z.string().optional(),
 });
 export type BoardTeammate = z.infer<typeof BoardTeammateSchema>;

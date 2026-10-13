@@ -8,6 +8,7 @@ export const TeammateSchema = z.object({
   description: z.string().optional(),
   provider: z.string().optional(),
   thinkingOptionId: z.string().optional(),
+  lastAgentId: z.string().optional(),
   boardId: z.string().optional(),
   boardName: z.string().optional(),
   heartbeatCron: z.string().optional(),
@@ -42,7 +43,7 @@ export const teammateCreateRpc = defineRpc({
       emoji: z.string().optional(),
     })
     .strict(),
-  output: z.object({ teammate: TeammateSchema }),
+  output: z.object({ teammate: TeammateSchema, agentId: z.string().optional() }),
 });
 
 export const teammateRenameRpc = defineRpc({

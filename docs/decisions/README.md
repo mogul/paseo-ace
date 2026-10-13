@@ -20,5 +20,7 @@ Key decisions for the `ace` plugin, newest last. Each record is immutable once a
 | [0014](0014-rename-boards-plugin.md) | Rename boards plugin to `ace-boards` | Accepted |
 | [0015](0015-column-zone-layout-drag.md) | Column/zone layout: stacked zones, nameless columns, grip drag | Accepted |
 | [0016](0016-group-terminology.md) | Rename column to group | Accepted |
+| [0017](0017-teammate-lifecycle.md) | Teammate lifecycle: create home + board + first session | Accepted |
+| [0018](0018-teammate-files-boot-home.md) | Teammate files (AGENTS/BOOT/ONBOARDING), boot injection, home-only start | Accepted |
 
 See `../architecture.md` for the current shape of the system.

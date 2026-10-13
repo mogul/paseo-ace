@@ -10,8 +10,8 @@ import {
 } from "./shared/contracts";
 import { McpServer } from "./server/mcp";
 import { PresenceTracker } from "./server/presence";
-import { HeartbeatScheduler } from "./server/scheduler";
-import { buildSystemPrompt, readBoards, TeammateStore } from "./server/teammates";
+import { HeartbeatScheduler, buildHeartbeatPrompt } from "./server/scheduler";
+import { buildSystemPrompt, createBoard, readBoards, TeammateStore } from "./server/teammates";
 
 export default function contribute(server: PluginServerContext) {
   const store = new TeammateStore();
@@ -47,19 +47,51 @@ export default function contribute(server: PluginServerContext) {
     };
   });
 
-  server.handle(teammateListRpc, () => ({ teammates: store.list() }));
+  server.handle(teammateListRpc, (_input, { paseo }) => {
+    capturePaseo(paseo);
+    return { teammates: store.list() };
+  });
 
-  server.handle(teammateBoardsRpc, () => ({ boards: readBoards() }));
+  server.handle(teammateBoardsRpc, (_input, { paseo }) => {
+    capturePaseo(paseo);
+    return { boards: readBoards() };
+  });
 
-  server.handle(teammateCreateRpc, ({ name, description, provider, thinkingOptionId, boardId, boardName, heartbeatCron, persona, emoji }) => ({
-    teammate: store.create(name, description, provider, thinkingOptionId, boardId, boardName, heartbeatCron, persona, emoji),
-  }));
+  server.handle(teammateCreateRpc, async ({ name, description, provider, thinkingOptionId, boardId, boardName, heartbeatCron, persona, emoji }, { paseo }) => {
+    capturePaseo(paseo);
 
-  server.handle(teammateRenameRpc, ({ id, name, boardId, boardName, heartbeatCron, persona, emoji }) => ({
-    teammate: store.rename(id, name, boardId, boardName, heartbeatCron, persona, emoji),
-  }));
+    let resolvedBoardId = boardId;
+    let resolvedBoardName = boardName;
+    if (!resolvedBoardId) {
+      const board = createBoard(name);
+      resolvedBoardId = board.id;
+      resolvedBoardName = board.name;
+    } else if (!resolvedBoardName) {
+      resolvedBoardName = readBoards().find((b) => b.id === resolvedBoardId)?.name;
+    }
 
-  server.handle(teammateDeleteRpc, ({ id }) => {
+    const teammate = store.create(name, description, provider, thinkingOptionId, resolvedBoardId, resolvedBoardName, heartbeatCron, persona, emoji);
+
+    const { systemPrompt, provider: resolvedProvider, thinkingOptionId: resolvedThinking } = buildSystemPrompt(store, teammate.id);
+    const agent = await paseo.agents.create({
+      config: { provider: resolvedProvider, thinkingOptionId: resolvedThinking, systemPrompt },
+      cwd: store.memoryPath(teammate.id),
+      title: teammate.name,
+      prompt: heartbeatCron ? buildHeartbeatPrompt(teammate) : "Introduce yourself and orient to your board.",
+    });
+    presence.markActive(teammate.id, agent.id);
+    store.setLastAgentId(teammate.id, agent.id);
+
+    return { teammate: store.get(teammate.id), agentId: agent.id };
+  });
+
+  server.handle(teammateRenameRpc, ({ id, name, boardId, boardName, heartbeatCron, persona, emoji }, { paseo }) => {
+    capturePaseo(paseo);
+    return { teammate: store.rename(id, name, boardId, boardName, heartbeatCron, persona, emoji) };
+  });
+
+  server.handle(teammateDeleteRpc, ({ id }, { paseo }) => {
+    capturePaseo(paseo);
     store.delete(id);
     return { ok: true };
   });
@@ -83,6 +115,7 @@ export default function contribute(server: PluginServerContext) {
       agentId = agent.id;
     }
     presence.markActive(id, agentId);
+    store.setLastAgentId(id, agentId);
     return { agentId };
   });
 

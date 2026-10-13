@@ -25,12 +25,13 @@ export function readBoardTeammates(): { teammates: BoardTeammate[]; active: stri
       if (parsed && Array.isArray(parsed.teammates)) {
         for (const raw of parsed.teammates) {
           if (!raw || typeof raw !== "object") continue;
-          const t = raw as { id?: unknown; name?: unknown; emoji?: unknown; boardId?: unknown };
+          const t = raw as { id?: unknown; name?: unknown; emoji?: unknown; lastAgentId?: unknown; boardId?: unknown };
           if (typeof t.id === "string" && typeof t.name === "string") {
             teammates.push({
               id: t.id,
               name: t.name,
               emoji: typeof t.emoji === "string" ? t.emoji : undefined,
+              lastAgentId: typeof t.lastAgentId === "string" ? t.lastAgentId : undefined,
               boardId: typeof t.boardId === "string" ? t.boardId : undefined,
             });
           }

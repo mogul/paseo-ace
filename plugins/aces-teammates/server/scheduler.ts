@@ -156,6 +156,7 @@ export class HeartbeatScheduler {
       });
       this.live.set(teammate.id, agent.id);
       this.presence.markActive(teammate.id, agent.id);
+      this.store.setLastAgentId(teammate.id, agent.id);
     } catch (error) {
       console.error(`[aces-teammates] heartbeat failed for ${teammate.id}:`, error);
     }
