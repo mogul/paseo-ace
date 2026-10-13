@@ -18,7 +18,6 @@ export type Zone = z.infer<typeof ZoneSchema>;
 
 export const GroupSchema = z.object({
   id: z.string().min(1),
-  title: z.string().min(1),
   width: z.number().positive().optional(),
   zones: z.array(ZoneSchema).min(1),
 });

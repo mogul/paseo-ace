@@ -61,7 +61,7 @@ export class BoardEngine {
     }
     const newGroupId = "col-" + randomUUID().slice(0, 8);
     this.store.update(boardId, (board) => {
-      board.groups.push({ id: newGroupId, title: zoneTitle, zones: [{ id, title: zoneTitle }] });
+      board.groups.push({ id: newGroupId, zones: [{ id, title: zoneTitle }] });
     });
   }
 

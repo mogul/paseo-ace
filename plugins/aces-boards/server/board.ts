@@ -10,10 +10,9 @@ const DEFAULT_BOARDS: BoardsData = {
       id: "main",
       name: "Main",
       groups: [
-        { id: "backlog", title: "Backlog", zones: [{ id: "backlog-1", title: "Backlog" }] },
+        { id: "backlog", zones: [{ id: "backlog-1", title: "Backlog" }] },
         {
           id: "review",
-          title: "Review",
           zones: [
             {
               id: "review-1",
@@ -27,7 +26,7 @@ const DEFAULT_BOARDS: BoardsData = {
             },
           ],
         },
-        { id: "human", title: "Human review", zones: [{ id: "human-1", title: "Human review" }] },
+        { id: "human", zones: [{ id: "human-1", title: "Human review" }] },
       ],
       placement: {},
       cardDefaults: {
@@ -130,7 +129,6 @@ export class BoardStore {
       groups: [
         {
           id: "col-" + randomUUID().slice(0, 8),
-          title: "New zone",
           zones: [{ id: "zone-" + randomUUID().slice(0, 8), title: "New zone" }],
         },
       ],
