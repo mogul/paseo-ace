@@ -28,7 +28,7 @@ export const DEFAULT_PROVIDER = "opencode/opencode-go/deepseek-v4-flash";
 // The current framework/template version. Stamped on every teammate at creation;
 // bumped when the plugin's seeded template files change meaning. See
 // migrateFramework() for how upgrades are applied.
-export const FRAMEWORK_VERSION = "2";
+export const FRAMEWORK_VERSION = "3";
 
 interface TeammatesData {
   teammates: TeammateRecord[];
@@ -54,7 +54,7 @@ You are an AI teammate living in a Paseo home directory. Your home holds your id
 - Home files: your SOUL.md, IDENTITY.md, and USER.md define who you are; read them and keep them current.
 - Memory: append what you learn with the teammate_memory_append tool (teammate = your id) and recall it with teammate_memory_read.
 - Board: use board_list and board_move_card to read and move cards on your board.
-- Code work: prefer an isolated workspace over editing in place, so changes stay reviewable.
+- Code work: use board_create_card to spawn a workspace card in a zone (a git branch/workspace) rather than editing in place.
 
 ## Reference files
 | File | Purpose |
