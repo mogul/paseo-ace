@@ -29,7 +29,7 @@ export const DEFAULT_PROVIDER = "opencode/opencode-go/deepseek-v4-flash";
 // The current framework/template version. Stamped on every teammate at creation;
 // bumped when the plugin's seeded template files change meaning. See
 // migrateFramework() for how upgrades are applied.
-export const FRAMEWORK_VERSION = "3";
+export const FRAMEWORK_VERSION = "4";
 
 interface TeammatesData {
   teammates: TeammateRecord[];
@@ -68,7 +68,10 @@ You are an AI teammate living in a Paseo home directory. Your home holds your id
 | BOARD.md | Meaning of each board zone |
 | HEARTBEAT.md | Periodic tasks |
 
-On a fresh session, read and follow BOOT.md.`;
+On a fresh session, read and follow BOOT.md.
+
+## Rebase conflicts
+If your branch is mid-rebase (git conflicts), resolve them before other work: take the incoming framework side for AGENTS.md and BOOT.md, keep your own content for the learned files, ask the user when both sides have meaningful content, then run git rebase --continue (or git rebase --abort to back out).`;
 export const BOOT_SEED =
   "# Boot\n\nAt the start of a fresh session, quietly rebuild context before replying: 1. You are already provided your SOUL.md, IDENTITY.md, and USER.md. 2. In a user-facing session, if ONBOARDING.md is present, follow it and use its current state as context; address the user's request first. 3. Search recent memory for relevant context; read BOARD.md only when the work needs it. Do not narrate this process.";
 export const ONBOARDING_SEED = `# Onboarding
@@ -468,6 +471,18 @@ export class TeammateStore {
   }
 }
 
+// Returns the unmerged files when the teammate's home is mid-rebase (empty otherwise).
+function rebaseConflicts(dir: string): string[] {
+  try {
+    const mergePath = execSync("git rev-parse --git-path rebase-merge", { cwd: dir, encoding: "utf8" }).trim();
+    const applyPath = execSync("git rev-parse --git-path rebase-apply", { cwd: dir, encoding: "utf8" }).trim();
+    if (!existsSync(mergePath) && !existsSync(applyPath)) return [];
+    return execSync("git diff --name-only --diff-filter=U", { cwd: dir, encoding: "utf8" }).trim().split(/\s+/).filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
 // Shared prompt assembly used by both teammate.start and the heartbeat scheduler.
 export function buildSystemPrompt(store: TeammateStore, id: string): { name: string; systemPrompt: string; provider: string; thinkingOptionId?: string } {
   const teammate = store.get(id);
@@ -478,6 +493,7 @@ export function buildSystemPrompt(store: TeammateStore, id: string): { name: str
   const soul = store.readText(id, "SOUL.md");
   const user = store.readText(id, "USER.md");
   const memory = store.readMemory(id, 7);
+  const conflicts = rebaseConflicts(store.memoryPath(id));
   const systemPrompt =
     `You are the teammate named ${teammate.name}.\n\n` +
     `${agents}\n\n` +
@@ -485,6 +501,9 @@ export function buildSystemPrompt(store: TeammateStore, id: string): { name: str
     `${boot}\n\n` +
     (onboarding ? `${onboarding}\n\n` : "") +
     `Recent memory:\n${memory}\n\n` +
-    `You may append what you learn to your memory using the teammate_memory_append tool with teammate = "${teammate.id}". You are "${teammate.id}".`;
+    `You may append what you learn to your memory using the teammate_memory_append tool with teammate = "${teammate.id}". You are "${teammate.id}".` +
+    (conflicts.length > 0
+      ? `\n\nYour branch is mid-rebase with conflicts in: ${conflicts.join(", ")}. Resolve them before other work. For AGENTS.md and BOOT.md, take the incoming (framework) side. For SOUL.md, USER.md, IDENTITY.md, BOARD.md, HEARTBEAT.md, and memory/, keep your own content. When both sides have meaningful content, ask the user. Then run git add and git rebase --continue, or git rebase --abort to back out.`
+      : "");
   return { name: teammate.name, systemPrompt, provider: teammate.provider || DEFAULT_PROVIDER, thinkingOptionId: teammate.thinkingOptionId };
 }
