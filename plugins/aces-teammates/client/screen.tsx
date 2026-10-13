@@ -3,7 +3,7 @@ import type { PluginScreenProps } from "@getpaseo/plugin/client";
 import { usePaseo, useRpc } from "@getpaseo/plugin/client";
 import { copyText, Modal, ScrollView as HostScrollView, TextInput as HostTextInput, useToast } from "@getpaseo/plugin/client/react-native";
 import { ExternalLink } from "@getpaseo/plugin/client/ui";
-import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useRef, useState } from "react";
 import { Dimensions, Pressable, Text, View } from "react-native";
 import {
@@ -17,6 +17,7 @@ import {
   type Teammate,
 } from "../shared/contracts";
 import { PERSONAS } from "../shared/personas";
+import { ProviderCombobox } from "./provider-combobox";
 
 const EMOJI_CHOICES = [
   "🤖", "🧊", "🗂️", "🔍", "📋", "🧠", "🛠️", "🚀",
@@ -110,7 +111,7 @@ export function TeammatesScreen({ theme, layout, navigation }: PluginScreenProps
     queryClient.invalidateQueries({ queryKey: ["aces-teammates", "teammates"] });
   }
 
-  async function handleCreate(input: { name: string; description?: string; provider?: string; boardId?: string; boardName?: string; heartbeatCron?: string; persona?: string; emoji?: string }) {
+  async function handleCreate(input: { name: string; description?: string; provider?: string; thinkingOptionId?: string; boardId?: string; boardName?: string; heartbeatCron?: string; persona?: string; emoji?: string }) {
     try {
       await create(input);
     } catch (err) {
@@ -274,7 +275,7 @@ function OverlayView({
   theme: PluginTheme;
   boards: BoardSummary[];
   onClose: () => void;
-  onCreate: (input: { name: string; description?: string; provider?: string; boardId?: string; boardName?: string; heartbeatCron?: string; persona?: string; emoji?: string }) => void;
+  onCreate: (input: { name: string; description?: string; provider?: string; thinkingOptionId?: string; boardId?: string; boardName?: string; heartbeatCron?: string; persona?: string; emoji?: string }) => void;
   onRename: (teammate: Teammate, name: string, boardId?: string, boardName?: string, heartbeatCron?: string, emoji?: string) => void;
   onDelete: (teammate: Teammate) => void;
   onStart: (teammate: Teammate, workspaceId?: string) => void;
@@ -382,80 +383,6 @@ function EmojiButton({ theme, value, onChange }: { theme: PluginTheme; value?: s
   );
 }
 
-function ProviderCombobox({ theme, value, onChange }: { theme: PluginTheme; value: string; onChange: (v: string) => void }) {
-  const c = theme.colors;
-  const paseo = usePaseo();
-  const [open, setOpen] = useState(false);
-  const [editing, setEditing] = useState(false);
-  const [filter, setFilter] = useState("");
-  const blurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const providersQuery = useQuery({
-    queryKey: ["aces-teammates", "providers"],
-    queryFn: () => paseo.providers.listAvailable(),
-    staleTime: 60000,
-  });
-  const harnesses = useMemo(() => (providersQuery.data?.providers ?? []).map((p) => p.provider), [providersQuery.data]);
-  const modelQueries = useQueries({
-    queries: harnesses.map((h) => ({
-      queryKey: ["aces-teammates", "models", h],
-      queryFn: () => paseo.providers.listModels(h),
-      staleTime: 60000,
-    })),
-  });
-
-  const options = useMemo(() => {
-    const out: string[] = [];
-    harnesses.forEach((h, i) => {
-      for (const m of modelQueries[i]?.data?.models ?? []) out.push(`${h}/${m.id}`);
-    });
-    return out;
-  }, [harnesses, modelQueries]);
-
-  const q = filter.trim().toLowerCase();
-  const matches = (q ? options.filter((o) => o.toLowerCase().includes(q)) : options).slice(0, 50);
-  const display = editing ? filter : value;
-
-  function closeSoon() {
-    if (blurTimer.current) clearTimeout(blurTimer.current);
-    blurTimer.current = setTimeout(() => { setOpen(false); setEditing(false); }, 150);
-  }
-
-  return (
-    <View style={{ gap: 6 }}>
-      <View style={{ ...inputStyle(c), flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 0 }}>
-        <HostTextInput
-          value={display}
-          onChangeText={(v) => { setFilter(v); onChange(v); setOpen(true); }}
-          style={{ flex: 1, color: c.foreground, padding: 8, fontSize: 13 }}
-          autoCapitalize="none"
-          autoCorrect={false}
-          placeholder="Search providers and models…"
-          placeholderTextColor={c.foregroundMuted}
-          onFocus={() => { if (blurTimer.current) clearTimeout(blurTimer.current); setEditing(true); setFilter(""); setOpen(true); }}
-          onBlur={closeSoon}
-        />
-        <Text style={{ color: c.foregroundMuted, fontSize: 12, paddingHorizontal: 8 }}>▾</Text>
-      </View>
-      {open && matches.length > 0 ? (
-        <HostScrollView style={{ maxHeight: 180, borderWidth: 1, borderColor: c.border, borderRadius: 8, backgroundColor: c.surface0 }} keyboardShouldPersistTaps="handled">
-          {matches.map((o) => (
-            <Pressable
-              key={o}
-              accessibilityRole="button"
-              accessibilityLabel={o}
-              onPress={() => { onChange(o); setEditing(false); setFilter(""); setOpen(false); }}
-              style={{ paddingHorizontal: 10, paddingVertical: 8 }}
-            >
-              <Text style={{ color: o === value ? c.accent : c.foreground, fontSize: 12 }}>{o}</Text>
-            </Pressable>
-          ))}
-        </HostScrollView>
-      ) : null}
-    </View>
-  );
-}
-
 function HeartbeatPicker({ theme, value, onChange }: { theme: PluginTheme; value: string; onChange: (v: string) => void }) {
   const c = theme.colors;
   const [custom, setCustom] = useState(value !== "" && !HEARTBEAT_PRESETS.some((p) => p.cron === value));
@@ -532,11 +459,12 @@ function PersonaPicker({ theme, value, onChange }: { theme: PluginTheme; value?:
   );
 }
 
-function NewTeammateModal({ theme, boards, onClose, onCreate }: { theme: PluginTheme; boards: BoardSummary[]; onClose: () => void; onCreate: (input: { name: string; description?: string; provider?: string; boardId?: string; boardName?: string; heartbeatCron?: string; persona?: string; emoji?: string }) => void }) {
+function NewTeammateModal({ theme, boards, onClose, onCreate }: { theme: PluginTheme; boards: BoardSummary[]; onClose: () => void; onCreate: (input: { name: string; description?: string; provider?: string; thinkingOptionId?: string; boardId?: string; boardName?: string; heartbeatCron?: string; persona?: string; emoji?: string }) => void }) {
   const c = theme.colors;
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [provider, setProvider] = useState("");
+  const [thinkingOptionId, setThinkingOptionId] = useState("");
   const [boardId, setBoardId] = useState<string | undefined>(undefined);
   const [heartbeatCron, setHeartbeatCron] = useState("");
   const [personaId, setPersonaId] = useState(PERSONAS[0].id);
@@ -567,7 +495,16 @@ function NewTeammateModal({ theme, boards, onClose, onCreate }: { theme: PluginT
         <Text style={labelStyle(c)}>Description</Text>
         <HostTextInput value={description} onChangeText={setDescription} style={inputStyle(c)} />
         <Text style={labelStyle(c)}>Provider</Text>
-        <ProviderCombobox theme={theme} value={provider} onChange={setProvider} />
+        <ProviderCombobox
+          theme={theme}
+          provider={provider}
+          thinkingOptionId={thinkingOptionId}
+          queryKeyPrefix="aces-teammates"
+          onChange={(next) => {
+            setProvider(next.provider);
+            setThinkingOptionId(next.thinkingOptionId ?? "");
+          }}
+        />
         <PersonaPicker theme={theme} value={personaId} onChange={selectPersona} />
         <BoardPicker theme={theme} boards={boards} value={boardId} onChange={setBoardId} />
         <HeartbeatPicker theme={theme} value={heartbeatCron} onChange={setHeartbeatCron} />
@@ -578,7 +515,7 @@ function NewTeammateModal({ theme, boards, onClose, onCreate }: { theme: PluginT
           <Pressable
             accessibilityRole="button"
             disabled={!name.trim()}
-            onPress={() => onCreate({ name: name.trim(), description: description.trim() || undefined, provider: provider.trim() || undefined, boardId, boardName: boards.find((b) => b.id === boardId)?.name, heartbeatCron: heartbeatCron.trim() || undefined, persona: personaId, emoji: emoji?.trim() })}
+            onPress={() => onCreate({ name: name.trim(), description: description.trim() || undefined, provider: provider.trim() || undefined, thinkingOptionId: thinkingOptionId.trim() || undefined, boardId, boardName: boards.find((b) => b.id === boardId)?.name, heartbeatCron: heartbeatCron.trim() || undefined, persona: personaId, emoji: emoji?.trim() })}
             style={{ padding: 8, borderRadius: 8, backgroundColor: c.accent, opacity: name.trim() ? 1 : 0.4 }}
           >
             <Text style={{ color: c.accentForeground, fontWeight: "600" }}>Create</Text>

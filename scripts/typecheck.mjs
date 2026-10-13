@@ -1,9 +1,12 @@
 import { execSync } from "node:child_process";
 import { readdirSync, statSync, existsSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const pluginsDir = join(root, "plugins");
+
+execSync(`node ${JSON.stringify(join(root, "scripts", "sync-shared.mjs"))}`, { stdio: "inherit" });
 
 const plugins = readdirSync(pluginsDir).filter((name) =>
   statSync(join(pluginsDir, name)).isDirectory(),

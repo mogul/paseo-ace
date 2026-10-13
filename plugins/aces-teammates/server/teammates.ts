@@ -9,6 +9,7 @@ interface TeammateRecord {
   name: string;
   description?: string;
   provider?: string;
+  thinkingOptionId?: string;
   boardId?: string;
   boardName?: string;
   heartbeatCron?: string;
@@ -244,7 +245,7 @@ export class TeammateStore {
     return join(this.teammatesDir, id);
   }
 
-  create(name: string, description?: string, provider?: string, boardId?: string, boardName?: string, heartbeatCron?: string, persona?: string, emoji?: string): Teammate {
+  create(name: string, description?: string, provider?: string, thinkingOptionId?: string, boardId?: string, boardName?: string, heartbeatCron?: string, persona?: string, emoji?: string): Teammate {
     const base = slugify(name);
     if (!base) throw new Error("Name must include at least one letter or number.");
     const id = this.uniqueSlug(base);
@@ -253,6 +254,7 @@ export class TeammateStore {
       name,
       description: description?.trim() || undefined,
       provider: provider?.trim() || undefined,
+      thinkingOptionId: thinkingOptionId?.trim() || undefined,
       boardId: boardId?.trim() || undefined,
       boardName: boardName?.trim() || undefined,
       heartbeatCron: heartbeatCron?.trim() || undefined,
@@ -344,7 +346,7 @@ export class TeammateStore {
 }
 
 // Shared prompt assembly used by both teammate.start and the heartbeat scheduler.
-export function buildSystemPrompt(store: TeammateStore, id: string): { name: string; systemPrompt: string; provider: string } {
+export function buildSystemPrompt(store: TeammateStore, id: string): { name: string; systemPrompt: string; provider: string; thinkingOptionId?: string } {
   const teammate = store.get(id);
   const identity = store.readText(id, "IDENTITY.md");
   const soul = store.readText(id, "SOUL.md");
@@ -355,5 +357,5 @@ export function buildSystemPrompt(store: TeammateStore, id: string): { name: str
     `${identity}\n${soul}\n${user}\n\n` +
     `Recent memory:\n${memory}\n\n` +
     `You may append what you learn to your memory using the teammate_memory_append tool with teammate = "${teammate.id}". You are "${teammate.id}".`;
-  return { name: teammate.name, systemPrompt, provider: teammate.provider || DEFAULT_PROVIDER };
+  return { name: teammate.name, systemPrompt, provider: teammate.provider || DEFAULT_PROVIDER, thinkingOptionId: teammate.thinkingOptionId };
 }

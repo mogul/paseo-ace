@@ -51,8 +51,8 @@ export default function contribute(server: PluginServerContext) {
 
   server.handle(teammateBoardsRpc, () => ({ boards: readBoards() }));
 
-  server.handle(teammateCreateRpc, ({ name, description, provider, boardId, boardName, heartbeatCron, persona, emoji }) => ({
-    teammate: store.create(name, description, provider, boardId, boardName, heartbeatCron, persona, emoji),
+  server.handle(teammateCreateRpc, ({ name, description, provider, thinkingOptionId, boardId, boardName, heartbeatCron, persona, emoji }) => ({
+    teammate: store.create(name, description, provider, thinkingOptionId, boardId, boardName, heartbeatCron, persona, emoji),
   }));
 
   server.handle(teammateRenameRpc, ({ id, name, boardId, boardName, heartbeatCron, persona, emoji }) => ({
@@ -67,17 +67,17 @@ export default function contribute(server: PluginServerContext) {
   server.handle(teammateStartRpc, async ({ id, workspaceId }, { paseo }) => {
     capturePaseo(paseo);
     if (!paseoApi) throw new Error("Paseo API is not available yet.");
-    const { name, systemPrompt, provider } = buildSystemPrompt(store, id);
+    const { name, systemPrompt, provider, thinkingOptionId } = buildSystemPrompt(store, id);
     let agentId: string;
     if (workspaceId) {
       const agent = await paseo.workspaces.ref(workspaceId).agents.create({
-        config: { provider, systemPrompt },
+        config: { provider, thinkingOptionId, systemPrompt },
         title: name,
       });
       agentId = agent.id;
     } else {
       const agent = await paseo.agents.create({
-        config: { provider, systemPrompt },
+        config: { provider, thinkingOptionId, systemPrompt },
         cwd: store.memoryPath(id),
       });
       agentId = agent.id;

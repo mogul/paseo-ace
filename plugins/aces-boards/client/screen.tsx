@@ -1,6 +1,6 @@
 import type { PluginTheme } from "@getpaseo/plugin";
 import type { PluginScreenProps } from "@getpaseo/plugin/client";
-import { usePaseo, useRpc } from "@getpaseo/plugin/client";
+import { useRpc } from "@getpaseo/plugin/client";
 import { Modal, ScrollView as HostScrollView, TextInput as HostTextInput, useToast } from "@getpaseo/plugin/client/react-native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -38,6 +38,7 @@ import {
   type ZoneTrigger,
 } from "../shared/contracts";
 import { DragSurface, measureInWindow, type DragFrames, type Frame, type Measurable } from "./dnd";
+import { ProviderCombobox } from "./provider-combobox";
 
 const DEFAULT_PROVIDER = "opencode/opencode-go/deepseek-v4-flash";
 const SUGGESTED_PROMPT = "Review the working tree in {{workspace.directory}} and summarize what changed.";
@@ -1202,7 +1203,6 @@ function CreateFindCardModal({
   const [projectCwd, setProjectCwd] = useState(defaults.projectCwd ?? "");
   const [baseBranch, setBaseBranch] = useState(defaults.baseBranch ?? "");
   const [provider, setProvider] = useState(defaults.provider ?? DEFAULT_PROVIDER);
-  const [modeId, setModeId] = useState(defaults.modeId ?? "");
   const [thinkingOptionId, setThinkingOptionId] = useState(defaults.thinkingOptionId ?? "");
   const [prompt, setPrompt] = useState(defaults.prompt ?? "");
   const [projectPickerOpen, setProjectPickerOpen] = useState(false);
@@ -1288,7 +1288,6 @@ function CreateFindCardModal({
       projectCwd,
       baseBranch: isolation === "worktree" ? baseBranch.trim() || undefined : undefined,
       provider: provider.trim() || undefined,
-      modeId: modeId.trim() || undefined,
       thinkingOptionId: thinkingOptionId.trim() || undefined,
       prompt: prompt.trim() || undefined,
     });
@@ -1341,14 +1340,14 @@ function CreateFindCardModal({
 
             <RadioOption theme={theme} selected={isolation === "directory"} label="Directory" onPress={() => setIsolation("directory")} />
 
-            <ProviderModelSelector
+            <Text style={labelStyle(c)}>Provider</Text>
+            <ProviderCombobox
               theme={theme}
               provider={provider}
-              modeId={modeId}
               thinkingOptionId={thinkingOptionId}
+              queryKeyPrefix="aces-boards"
               onChange={(next) => {
-                setProvider(next.provider ?? "");
-                setModeId(next.modeId ?? "");
+                setProvider(next.provider);
                 setThinkingOptionId(next.thinkingOptionId ?? "");
               }}
             />
@@ -1447,19 +1446,6 @@ function RenameBoardModal({ theme, currentName, onClose, onRename }: { theme: Pl
   );
 }
 
-type ProviderSelection = {
-  provider?: string;
-  modeId?: string;
-  thinkingOptionId?: string;
-};
-
-function splitProvider(provider?: string): { harness: string; model: string } {
-  const p = provider?.trim() ?? "";
-  const idx = p.indexOf("/");
-  if (idx === -1) return { harness: p, model: "" };
-  return { harness: p.slice(0, idx), model: p.slice(idx + 1) };
-}
-
 function SegmentedControl({ theme, options, value, onChange }: { theme: PluginTheme; options: { id: string; label: string }[]; value: string; onChange: (id: string) => void }) {
   const c = theme.colors;
   return (
@@ -1476,141 +1462,6 @@ function SegmentedControl({ theme, options, value, onChange }: { theme: PluginTh
   );
 }
 
-function Dropdown({
-  theme,
-  value,
-  options,
-  onSelect,
-  disabled,
-  placeholder,
-  loading,
-}: {
-  theme: PluginTheme;
-  value: string;
-  options: { id: string; label: string }[];
-  onSelect: (id: string) => void;
-  disabled?: boolean;
-  placeholder: string;
-  loading?: boolean;
-}) {
-  const c = theme.colors;
-  const [open, setOpen] = useState(false);
-  const selected = options.find((o) => o.id === value);
-  const label = selected?.label ?? (value ? value : loading ? "Loading…" : placeholder);
-  return (
-    <View>
-      <Pressable accessibilityRole="button" disabled={disabled} onPress={() => setOpen((o) => !o)} style={{ ...inputStyle(c), flexDirection: "row", justifyContent: "space-between", alignItems: "center", opacity: disabled ? 0.4 : 1 }}>
-        <Text style={{ color: c.foreground }} numberOfLines={1}>{label}</Text>
-        <Text style={{ color: c.foregroundMuted }}>▾</Text>
-      </Pressable>
-      {open && !disabled ? (
-        <View style={{ backgroundColor: c.surface1, borderRadius: 8, borderWidth: 1, borderColor: c.border, marginTop: 2 }}>
-          {options.length === 0 ? (
-            <Text style={{ color: c.foregroundMuted, fontSize: 12, padding: 10 }}>{loading ? "Loading…" : "None available"}</Text>
-          ) : (
-            options.map((o) => (
-              <Pressable key={o.id} accessibilityRole="button" onPress={() => { onSelect(o.id); setOpen(false); }} style={{ padding: 10 }}>
-                <Text style={{ color: o.id === value ? c.accent : c.foreground }}>{o.label}</Text>
-              </Pressable>
-            ))
-          )}
-        </View>
-      ) : null}
-    </View>
-  );
-}
-
-function ProviderModelSelector({
-  theme,
-  provider,
-  modeId,
-  thinkingOptionId,
-  onChange,
-}: {
-  theme: PluginTheme;
-  provider?: string;
-  modeId?: string;
-  thinkingOptionId?: string;
-  onChange: (next: ProviderSelection) => void;
-}) {
-  const paseo = usePaseo();
-
-  const [sel, setSel] = useState(() => {
-    const { harness, model } = splitProvider(provider);
-    return { harness, model, modeId: modeId ?? "", thinkingOptionId: thinkingOptionId ?? "" };
-  });
-
-  const providersQuery = useQuery({ queryKey: ["aces-boards", "providers"], queryFn: () => paseo.providers.listAvailable() });
-  const modelsQuery = useQuery({
-    queryKey: ["aces-boards", "models", sel.harness],
-    queryFn: () => paseo.providers.listModels(sel.harness),
-    enabled: sel.harness.length > 0,
-  });
-  const modesQuery = useQuery({
-    queryKey: ["aces-boards", "modes", sel.harness],
-    queryFn: () => paseo.providers.listModes(sel.harness),
-    enabled: sel.harness.length > 0,
-  });
-
-  const providers = useMemo(() => (providersQuery.data?.providers ?? []).map((p) => ({ id: p.provider, label: p.provider })), [providersQuery.data]);
-  const models = useMemo(() => (modelsQuery.data?.models ?? []).map((m) => ({ id: m.id, label: m.label })), [modelsQuery.data]);
-  const modes = useMemo(() => (modesQuery.data?.modes ?? []).map((m) => ({ id: m.id, label: m.label })), [modesQuery.data]);
-
-  const rawModels = useMemo(() => modelsQuery.data?.models ?? [], [modelsQuery.data]);
-  const selectedModel = useMemo(() => rawModels.find((m) => m.id === sel.model) ?? null, [rawModels, sel.model]);
-  const thinkingOptions = useMemo(() => (selectedModel?.thinkingOptions ?? []).map((t) => ({ id: t.id, label: t.label })), [selectedModel]);
-
-  function apply(next: { harness: string; model: string; modeId: string; thinkingOptionId: string }) {
-    setSel(next);
-    onChange({
-      provider: next.harness && next.model ? `${next.harness}/${next.model}` : undefined,
-      modeId: next.modeId || undefined,
-      thinkingOptionId: next.thinkingOptionId || undefined,
-    });
-  }
-
-  useEffect(() => {
-    if (!sel.harness) return;
-    let next = sel;
-    if (rawModels.length > 0 && (!sel.model || !rawModels.some((m) => m.id === sel.model))) {
-      const def = rawModels.find((m) => m.isDefault) ?? rawModels[0];
-      next = { ...next, model: def.id };
-    }
-    if (modes.length > 0 && (!next.modeId || !modes.some((m) => m.id === next.modeId))) {
-      next = { ...next, modeId: modes[0].id };
-    }
-    const modelDef = rawModels.find((m) => m.id === next.model) ?? null;
-    const topts = modelDef?.thinkingOptions ?? [];
-    if (topts.length > 0 && (!next.thinkingOptionId || !topts.some((t) => t.id === next.thinkingOptionId))) {
-      const def = topts.find((t) => t.isDefault) ?? topts[0];
-      next = { ...next, thinkingOptionId: def.id };
-    }
-    if (next !== sel) apply(next);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sel, rawModels, modes]);
-
-  return (
-    <View style={{ gap: 8 }}>
-      <View>
-        <Text style={labelStyle(theme.colors)}>Provider</Text>
-        <Dropdown theme={theme} value={sel.harness} options={providers} placeholder="Select provider" loading={providersQuery.isLoading} onSelect={(h) => apply({ harness: h, model: "", modeId: "", thinkingOptionId: "" })} />
-      </View>
-      <View>
-        <Text style={labelStyle(theme.colors)}>Model</Text>
-        <Dropdown theme={theme} value={sel.model} options={models} placeholder={sel.harness ? "Select model" : "Choose a provider first"} disabled={!sel.harness} loading={modelsQuery.isLoading} onSelect={(m) => apply({ ...sel, model: m, thinkingOptionId: "" })} />
-      </View>
-      <View>
-        <Text style={labelStyle(theme.colors)}>Mode</Text>
-        <Dropdown theme={theme} value={sel.modeId} options={modes} placeholder={sel.harness ? "Select mode" : "Choose a provider first"} disabled={!sel.harness} loading={modesQuery.isLoading} onSelect={(mo) => apply({ ...sel, modeId: mo })} />
-      </View>
-      <View>
-        <Text style={labelStyle(theme.colors)}>Thinking option</Text>
-        <Dropdown theme={theme} value={sel.thinkingOptionId} options={thinkingOptions} placeholder={selectedModel ? "Select thinking option" : "Select a model first"} disabled={!selectedModel} onSelect={(t) => apply({ ...sel, thinkingOptionId: t })} />
-      </View>
-    </View>
-  );
-}
-
 function CardDefaultsModal({ theme, defaults, onClose, onSave }: { theme: PluginTheme; defaults?: CardDefaults; onClose: () => void; onSave: (cardDefaults: CardDefaults) => void }) {
   const c = theme.colors;
   const getProjects = useRpc(boardProjectsRpc);
@@ -1619,7 +1470,6 @@ function CardDefaultsModal({ theme, defaults, onClose, onSave }: { theme: Plugin
   const [projectCwd, setProjectCwd] = useState(defaults?.projectCwd ?? "");
   const [baseBranch, setBaseBranch] = useState(defaults?.baseBranch ?? "");
   const [provider, setProvider] = useState(defaults?.provider ?? DEFAULT_PROVIDER);
-  const [modeId, setModeId] = useState(defaults?.modeId ?? "");
   const [thinkingOptionId, setThinkingOptionId] = useState(defaults?.thinkingOptionId ?? "");
   const [prompt, setPrompt] = useState(defaults?.prompt ?? "");
   const [projectPickerOpen, setProjectPickerOpen] = useState(false);
@@ -1647,7 +1497,6 @@ function CardDefaultsModal({ theme, defaults, onClose, onSave }: { theme: Plugin
       projectCwd: projectCwd || undefined,
       baseBranch: baseBranch.trim() || undefined,
       provider: provider.trim() || undefined,
-      modeId: modeId.trim() || undefined,
       thinkingOptionId: thinkingOptionId.trim() || undefined,
       prompt: prompt.trim() || undefined,
     });
@@ -1682,14 +1531,14 @@ function CardDefaultsModal({ theme, defaults, onClose, onSave }: { theme: Plugin
 
         <RadioOption theme={theme} selected={isolation === "directory"} label="Directory" onPress={() => setIsolation("directory")} />
 
-        <ProviderModelSelector
+        <Text style={labelStyle(c)}>Provider</Text>
+        <ProviderCombobox
           theme={theme}
           provider={provider}
-          modeId={modeId}
           thinkingOptionId={thinkingOptionId}
+          queryKeyPrefix="aces-boards"
           onChange={(next) => {
-            setProvider(next.provider ?? "");
-            setModeId(next.modeId ?? "");
+            setProvider(next.provider);
             setThinkingOptionId(next.thinkingOptionId ?? "");
           }}
         />

@@ -147,9 +147,9 @@ export class HeartbeatScheduler {
 
   private async fire(paseo: PaseoApi, teammate: Teammate): Promise<void> {
     try {
-      const { name, systemPrompt, provider } = buildSystemPrompt(this.store, teammate.id);
+      const { name, systemPrompt, provider, thinkingOptionId } = buildSystemPrompt(this.store, teammate.id);
       const agent = await paseo.agents.create({
-        config: { provider, systemPrompt },
+        config: { provider, thinkingOptionId, systemPrompt },
         cwd: this.store.memoryPath(teammate.id),
         title: name,
         prompt: buildHeartbeatPrompt(teammate),
